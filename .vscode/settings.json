@@ -2,5 +2,6 @@
     "totvsLanguageServer.welcomePage": false,
     "totvsLanguageServer.editor.linter.includes": "C:\\99 - Fontes\\include_2410",
     "advpl.environments": [],
-    "advpl.selectedEnvironment": "Selecione o Ambiente"
+    "advpl.selectedEnvironment": "Selecione o Ambiente",
+    "files.encoding": "windows1252"
 }
