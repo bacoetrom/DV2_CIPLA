@@ -1,0 +1,364 @@
+#include "tlpp-core.th"
+#include "totvs.ch"
+
+// Chaves (pedido|item|armazem destino) ja autorizadas nesta sessao de edicao,
+// para nao repetir o prompt de senha/justificativa a cada novo clique em
+// Salvar enquanto o usuario nao alterar novamente o valor da mesma linha.
+Static aMT410TKVal := {} as Array
+
+/*/{Protheus.doc} MT410TOK
+Ponto de entrada real e documentado da rotina MATA410 (Pedido de Venda),
+disparado pela rotina padrao ao confirmar a operacao (botao Salvar) de
+Inclusao, Alteracao, Exclusao ou Copia do pedido ? sintaxe oficial
+MT410TOK([nOpc], [aRecnoSE1RA]).
+
+Ao confirmar o pedido, percorre todas as linhas de aCols e, para cada item
+que ja existia fisicamente gravado em SC6 e teve o Armazem (C6_LOCAL)
+alterado, exige Assinatura Eletronica (senha do proprio usuario logado) e
+Justificativa antes de liberar a gravacao. Uma linha nova (sem registro
+fisico anterior em SC6) nunca exige justificativa. Ao confirmar, grava o
+registro de auditoria na tabela ZTL via U_ZTLGravaLog() (motor generico de
+auditoria compartilhado, ja usado por A010TOK e CICOMR01 - ver
+ZTLU001.tlpp).
+
+Substitui a implementacao anterior "WM410LINE", que usava um nome de Ponto
+de Entrada inexistente na rotina MATA410 e por isso nunca era chamada pela
+rotina padrao.
+
+PARAMIXB:
+  [1] nOpc         - Numeric - Codigo da operacao confirmada
+  [2] aRecnoSE1RA  - Array   - Recnos de SE1/RA relacionados (nao utilizado
+                      nesta implementacao)
+
+@type user function
+@author Pablo Regis
+@since 15/09/2026
+@return Logical, .T. permite a conclusao da operacao / .F. nao permite
+@obs Nao executado dentro de Begin/End Transaction (dispara antes da
+gravacao, ao clicar em Salvar). Nao adicionar prefixo U_ na declaracao da
+funcao. Depende das variaveis Private aCols/aHeader e do alias SC5/SC6
+posicionados pela rotina padrao MATA410.
+@see MATA410
+@see ZTLGravaLog
+/*/
+User Function MT410TOK() as Logical
+
+	Local nOpc  := 0  as Numeric
+	Local lRet  := .T. as Logical
+
+	If Type("PARAMIXB") == "A" .And. Len(PARAMIXB) >= 1 .And. ValType(PARAMIXB[1]) == "N"
+		nOpc := PARAMIXB[1]
+	EndIf
+
+	// Operacao de exclusao do pedido nao exige validacao de Armazem.
+	If nOpc == 5
+		Return .T.
+	EndIf
+
+	Try
+		lRet := MT410TKVldGrid()
+	Catch oError
+		FWLogMsg("ERROR", , "MT410TOK", "MT410TOK", , "01", oError:Description, 0, 0, {})
+		lRet := .T.
+	EndTry
+
+Return lRet
+
+/*/{Protheus.doc} MT410TKVldGrid
+Percorre todas as linhas nao deletadas de aCols e aplica a validacao de
+Armazem (senha + justificativa) em cada uma que tenha sido efetivamente
+alterada em relacao ao valor fisico gravado em SC6.
+@type static function
+@author Pablo Regis
+@since 15/09/2026
+@return logical, .T. se todas as linhas foram liberadas, .F. se alguma foi
+bloqueada (cancelamento ou senha invalida)
+/*/
+Static Function MT410TKVldGrid() as Logical
+
+	Local nPosLocal  := 0  as Numeric
+	Local nPosItem   := 0  as Numeric
+	Local nI         := 0  as Numeric
+	Local lRet       := .T. as Logical
+
+	If ValType(aCols) <> "A" .Or. ValType(aHeader) <> "A"
+		Return .T.
+	EndIf
+
+	nPosLocal := aScan(aHeader, {|aCampo| AllTrim(aCampo[2]) == "C6_LOCAL"})
+	nPosItem  := aScan(aHeader, {|aCampo| AllTrim(aCampo[2]) == "C6_ITEM"})
+
+	If nPosLocal == 0 .Or. nPosItem == 0
+		Return .T.
+	EndIf
+
+	For nI := 1 To Len(aCols)
+
+		// Ultima posicao de aCols[nI] indica se a linha foi marcada para
+		// seOKrecno (padrao MSGetDados): .T. = linha deletada na grid.
+		If aCols[nI][Len(aCols[nI])] == .T.
+			Loop
+		EndIf
+
+		If !MT410TKVldLinha(nI, nPosLocal, nPosItem)
+			lRet := .F.
+		EndIf
+
+	Next nI
+
+Return lRet
+
+/*/{Protheus.doc} MT410TKVldLinha
+Valida a alteracao de Armazem de uma linha especifica da grid.
+@type static function
+@author Pablo Regis
+@since 15/09/2026
+@param nLinha, numeric, Numero da linha corrente de aCols
+@param nPosLocal, numeric, Posicao de C6_LOCAL em aHeader/aCols
+@param nPosItem, numeric, Posicao de C6_ITEM em aHeader/aCols
+@return logical, .T. permite a linha, .F. bloqueia
+/*/
+Static Function MT410TKVldLinha(nLinha as Numeric, nPosLocal as Numeric, nPosItem as Numeric) as Logical
+
+	Local cItemLin   := "" as Character
+	Local cLocalAnt  := "" as Character
+	Local cLocalNovo := "" as Character
+	Local cChaveLin  := "" as Character
+	Local lRet       := .T. as Logical
+
+	cItemLin  := AllTrim(aCols[nLinha][nPosItem])
+	cLocalNovo := AllTrim(aCols[nLinha][nPosLocal])
+
+	If Empty(cItemLin) .Or. Empty(cLocalNovo)
+		Return .T.
+	EndIf
+
+	cLocalAnt := MT410TKLocalGrv(cItemLin)
+
+	// Sem valor anterior gravado (linha nova) ou sem alteracao efetiva:
+	// nao exige assinatura eletronica.
+	If Empty(cLocalAnt) .Or. cLocalNovo == cLocalAnt
+		Return .T.
+	EndIf
+
+	cChaveLin := MT410TKChaveLin(cItemLin, cLocalNovo)
+
+	// Ja autorizado nesta sessao de edicao para este item, com este mesmo
+	// valor de destino: nao repete o prompt a cada clique em Salvar.
+	If AScan(aMT410TKVal, {|c| c == cChaveLin}) > 0
+		Return .T.
+	EndIf
+
+	lRet := MT410TKAssinaEle(cItemLin, cLocalAnt, cLocalNovo)
+
+	If lRet
+		aAdd(aMT410TKVal, cChaveLin)
+	EndIf
+
+Return lRet
+
+/*/{Protheus.doc} MT410TKLocalGrv
+Retorna o valor de C6_LOCAL efetivamente gravado no banco (SC6) para o item
+informado do pedido corrente (posicionado em SC5). Assume que SC5 esta
+posicionado no pedido em edicao (mesmo padrao ja adotado na implementacao
+anterior deste ponto de entrada). Se o item ainda nao existir fisicamente
+(linha nova), retorna vazio.
+@type static function
+@author Pablo Regis
+@since 15/09/2026
+@param cItem, character, Numero do item (C6_ITEM) sendo validado
+@return character, valor gravado de C6_LOCAL, ou vazio se e uma linha nova
+/*/
+Static Function MT410TKLocalGrv(cItem as Character) as Character
+
+	Local cLocalGrv := "" as Character
+	Local cAliasAnt := "" as Character
+
+	If Select("SC6") == 0 .Or. Select("SC5") == 0
+		Return ""
+	EndIf
+
+	cAliasAnt := SC6->(GetArea())
+
+	SC6->(DbSetOrder(1))
+	If SC6->(DbSeek(xFilial("SC6") + SC5->C5_NUM + cItem))
+		If !Empty(SC6->C6_LOCAL)
+			cLocalGrv := AllTrim(SC6->C6_LOCAL)
+		EndIf
+	EndIf
+
+	SC6->(RestArea(cAliasAnt))
+
+Return cLocalGrv
+
+/*/{Protheus.doc} MT410TKChaveLin
+Monta a chave de controle (pedido + item + valor de destino) usada para
+identificar, dentro da sessao corrente, se a alteracao do Armazem daquele
+item ja foi autorizada com aquele valor especifico.
+@type static function
+@author Pablo Regis
+@since 15/09/2026
+@param cItem, character, Numero do item (C6_ITEM)
+@param cLocalNovo, character, Valor de destino do Armazem
+@return character, chave de controle no formato "<C5_NUM>|<item>|<C6_LOCAL>"
+/*/
+Static Function MT410TKChaveLin(cItem as Character, cLocalNovo as Character) as Character
+
+	Local cNumPed := "" as Character
+
+	If Select("SC5") > 0
+		cNumPed := AllTrim(SC5->C5_NUM)
+	EndIf
+
+Return cNumPed + "|" + cItem + "|" + cLocalNovo
+
+/*/{Protheus.doc} MT410TKAssinaEle
+Exibe dialogo unico de Assinatura Eletronica com os campos Justificativa e
+Senha lado a lado (mesmo layout do fonte de referencia CICOMR01.tlpp),
+exigindo a senha do proprio usuario logado antes de liberar a alteracao do
+Armazem de um item ja gravado do pedido de venda. Grava o log de auditoria
+na tabela ZTL via U_ZTLGravaLog() (mesmo motor generico usado por CICOMR01,
+ver ZTLU001.tlpp) quando confirmado.
+@type static function
+@author Pablo Regis
+@since 15/09/2026
+@param cItem, character, Numero do item (C6_ITEM) sendo alterado
+@param cLocalAnt, character, Armazem atualmente gravado (valor de origem)
+@param cLocalNovo, character, Armazem digitado pelo usuario (valor de destino)
+@return logical, .T. se a senha e a justificativa foram confirmadas
+/*/
+Static Function MT410TKAssinaEle(cItem as Character, cLocalAnt as Character, cLocalNovo as Character) as Logical
+
+	Local oDlg       as Object
+	Local oGetSenha  as Object
+	Local oGetChave  as Object
+	Local oGetJust   as Object
+	Local cSenha     := Space(20)  as Character
+	Local cChave     := Space(40)  as Character
+	Local cJustif    := Space(200) as Character
+	Local cCodUsr    := AllTrim(RetCodUsr())         as Character
+	Local cNomUsr    := AllTrim(UsrRetName(cCodUsr)) as Character
+	Local cUsuario   := cCodUsr + " - " + cNomUsr    as Character
+	Local lConfirma  := .F. as Logical
+
+	DEFINE MSDIALOG oDlg TITLE "Assinatura Eletronica - Alteracao de Armazem" FROM 000, 000 TO 360, 450 PIXEL
+
+		@ 008, 008 SAY "Usuario logado" SIZE 180, 008 OF oDlg PIXEL
+		@ 018, 008 SAY cUsuario SIZE 180, 008 OF oDlg PIXEL
+
+		@ 034, 008 SAY "Justificativa" SIZE 180, 008 OF oDlg PIXEL
+		@ 044, 008 GET oGetJust VAR cJustif MEMO SIZE 180, 050 OF oDlg PIXEL
+
+		@ 100, 008 SAY "Senha" SIZE 180, 008 OF oDlg PIXEL
+		@ 110, 008 MSGET oGetSenha VAR cSenha SIZE 180, 010 PASSWORD OF oDlg PIXEL
+
+		@ 128, 008 SAY "Chave" SIZE 180, 008 OF oDlg PIXEL
+		@ 138, 008 MSGET oGetChave VAR cChave SIZE 180, 010 PASSWORD OF oDlg PIXEL
+
+		DEFINE SBUTTON FROM 160, 80  TYPE 1 ENABLE OF oDlg ACTION (lConfirma := MT410TKVldAssEl(cSenha, cChave, cJustif), MT410TKFechaDlg(oDlg, lConfirma))
+		DEFINE SBUTTON FROM 160, 115 TYPE 2 ENABLE OF oDlg ACTION (lConfirma := .F., oDlg:End())
+
+	ACTIVATE MSDIALOG oDlg CENTERED
+
+	If lConfirma
+		U_ZTLGravaLog("MT410TOK", "SC6", SC5->C5_NUM + cItem, "C6_LOCAL", cLocalAnt, cLocalNovo, AllTrim(cJustif))
+	EndIf
+
+Return lConfirma
+
+/*/{Protheus.doc} MT410TKFechaDlg
+Fecha o dialogo de Assinatura Eletronica quando a confirmacao (senha e
+justificativa) e valida.
+@type static function
+@author Pablo Regis
+@since 15/09/2026
+@param oDlg, object, Dialogo de Assinatura Eletronica
+@param lFechar, logical, .T. fecha o dialogo
+@return Nil
+/*/
+Static Function MT410TKFechaDlg(oDlg as Object, lFechar as Logical)
+
+	If lFechar
+		oDlg:End()
+	EndIf
+
+Return Nil
+
+/*/{Protheus.doc} MT410TKVldAssEl
+Valida a obrigatoriedade da senha, da Chave de autorizacao e da
+justificativa digitadas no dialogo de Assinatura Eletronica (layout e
+estrutura da Chave iguais ao CICOMR01.tlpp: parametro proprio via
+SuperGetMv, com o mesmo default "123456").
+@type static function
+@author Pablo Regis
+@since 15/09/2026
+@param cSenha, character, Senha digitada pelo usuario
+@param cChave, character, Chave de autorizacao digitada pelo usuario
+@param cJustif, character, Justificativa digitada pelo usuario
+@return logical, .T. se senha, chave e justificativa sao validas
+/*/
+Static Function MT410TKVldAssEl(cSenha as Character, cChave as Character, cJustif as Character) as Logical
+
+	Local _cChaveOk := SuperGetMv("FS_MT410TK", .F., "123456") as Character
+	Local lRet       := .T. as Logical
+
+	If Empty(AllTrim(cJustif))
+		MsgAlert("Informe a justificativa para alterar o Armazem do item.", "Assinatura Eletronica - Alteracao de Armazem")
+		Return .F.
+	EndIf
+
+	If Empty(AllTrim(cSenha))
+		MsgAlert("Informe a senha para confirmar.", "Assinatura Eletronica - Alteracao de Armazem")
+		Return .F.
+	EndIf
+
+	If !MT410TKVldSenha(cSenha)
+		MsgAlert("Senha invalida.", "Assinatura Eletronica - Alteracao de Armazem")
+		Return .F.
+	EndIf
+
+	If _cChaveOk <> Alltrim(cChave)
+		MsgAlert("Chave invalida.", "Assinatura Eletronica - Alteracao de Armazem")
+		lRet := .F.
+	EndIf
+
+Return lRet
+
+/*/{Protheus.doc} MT410TKVldSenha
+Valida a senha digitada do proprio usuario logado, usando exatamente o
+mesmo criterio do fonte de referencia CICOMR01.tlpp: PswOrder(2) +
+PswSeek(cNomUsr, .T.) posicionando o usuario pelo nome completo, e
+comparando a senha digitada contra o campo bruto retornado por PswRet()
+(_aArray[1][3]), com PswName(cSenha) como alternativa caso a comparacao
+direta falhe.
+
+@obs Este e o mesmo criterio ja usado em producao pelo CICOMR01.tlpp (nao
+alterado). Como ja identificado anteriormente nesta mesma conversa,
+PswSeek()/PswName() deixaram de validar senha de forma confiavel a partir
+do Protheus 11 (falha de seguranca corrigida pela TOTVS) - ou seja, este
+criterio pode nao bloquear senha incorreta de forma garantida em versoes
+mais novas. Adotado aqui a pedido explicito, para manter o mesmo padrao
+usado no CICOMR01.tlpp.
+@type static function
+@author Pablo Regis
+@since 15/09/2026
+@param cSenha, character, Senha digitada pelo usuario a validar
+@return logical, .T. se a senha do usuario logado esta correta
+/*/
+Static Function MT410TKVldSenha(cSenha as Character) as Logical
+
+	Local cNomUsr  := Alltrim(UsrRetName(RetCodUsr())) as Character
+	Local aRetPsw  as Array
+	Local lRet     := .F. as Logical
+
+	PswOrder(2)
+	If PswSeek(cNomUsr, .T.)
+		aRetPsw := PswRet()
+		If Alltrim(aRetPsw[1][3]) == Alltrim(cSenha)
+			lRet := .T.
+		ElseIf PswName(Alltrim(cSenha))
+			lRet := .T.
+		EndIf
+	EndIf
+
+Return lRet

@@ -1,0 +1,238 @@
+#include "tlpp-core.th"
+#INCLUDE 'rwmake.ch'
+#INCLUDE 'topconn.ch'
+#INCLUDE "TBICONN.CH"
+
+#DEFINE CRLF CHR(13)+CHR(10)
+
+/*/{Protheus.doc} CICOMR01
+Validacao de senha para confirmar a alteracao de um ou mais campos sensiveis do fornecedor
+(ex.: Bloqueio - A2_MSBLQL, Qualificacao - A2_XSTATU) e registro da auditoria correspondente.
+@type function
+@version 3.0
+@author Pablo Regis
+@since 23/07/2026
+@param aAlteracoes, array, "Array de alteracoes de campos sensiveis ja detectadas pelo chamador. Cada item e um array {cCampo, cValorAnt, cValorNovo}. Array vazio ou omitido indica que nao ha alteracao a confirmar"
+@return logical, "retorna .T. se nao houver alteracao a confirmar ou se a senha/chave/justificativa forem validadas com sucesso para TODAS as alteracoes informadas; ou .F. se a senha/chave/justificativa informadas forem invalidas ou o usuario cancelar a confirmacao"
+@table SA2
+@description Recebe do chamador a lista de campos sensiveis do fornecedor que ja mudaram de
+valor (deteccao feita pelo proprio chamador, ex.: Entry Point CUSTOMERVENDOR em PE_MATA020.prw),
+evitando que a rotina seja acionada uma vez por campo alterado. Quando ha pelo menos uma
+alteracao e a operacao corrente e uma alteracao de registro existente (ALTERA), exibe UMA UNICA
+interface listando todos os campos alterados (de -> para), solicitando justificativa obrigatoria,
+alem da redigitacao da senha de login e da Chave de autorizacao (parametro FS_CICOMR01) para
+confirmar a acao. A confirmacao (senha/chave/justificativa) e feita uma unica vez, independente
+da quantidade de campos alterados. Somente apos a confirmacao ser bem sucedida e que a rotina
+percorre a lista de alteracoes e grava um registro de auditoria por campo no motor generico ZTL
+via U_ZTLGravaLog (ver ZTLU001.tlpp). Titulo do campo e descricao dos valores (quando aplicavel)
+sao obtidos dinamicamente do dicionario de dados (SX3), via X3Titulo() e X3Combo(), sem mapeamento
+fixo no codigo.
+Uso tipico (chamado por um Entry Point que ja detectou as alteracoes, e NAO mais pelo Valid
+individual de cada campo no SX3 - isso evitaria multiplas telas de confirmacao quando mais de
+um campo sensivel muda na mesma edicao):
+  aAlteracoes := {}
+  If oModel:GetValue("A2_MSBLQL") <> SA2->A2_MSBLQL
+      aAdd(aAlteracoes, {"A2_MSBLQL", SA2->A2_MSBLQL, oModel:GetValue("A2_MSBLQL")})
+  EndIf
+  If oModel:GetValue("A2_XSTATU") <> SA2->A2_XSTATU
+      aAdd(aAlteracoes, {"A2_XSTATU", SA2->A2_XSTATU, oModel:GetValue("A2_XSTATU")})
+  EndIf
+  lRet := U_CICOMR01(aAlteracoes)
+/*/
+User Function CICOMR01(aAlteracoes as Array) as Logical
+
+    Local aArea      := GetArea()                    as Array
+    Local lRet       := .T.                          as Logical
+    Local cCodUsr    := RetCodUsr()                  as Character
+    Local cNomUsr    := Alltrim(UsrRetName(cCodUsr)) as Character
+    Local cChaveForn := ""                           as Character
+    Local cMsgAlt    := ""                           as Character
+    Local nI         := 0                            as Numeric
+    Local _cChaveOk  := SuperGetMv("FS_CICOMR01", .F., "123456") as Character
+    Local _aArray    := {}                           as Array
+    Local _lVl       := .F.                          as Logical
+
+    Private _oTela       := Nil          as Object
+    Private _lOp         := .F.          as Logical
+    Private _cSenha      := Space(40)    as Character
+    Private _cChave      := Space(40)    as Character
+    Private _cJustif     := Space(200)   as Character
+    Private _cListaAlt   := Space(200)   as Character
+
+    Default aAlteracoes := {}
+
+    // Sem alteracao de campo sensivel a confirmar, ou fora de uma edicao de registro
+    // ja existente (nao se aplica a inclusao): nada a fazer
+    If !ALTERA .Or. Len(aAlteracoes) == 0
+        RestArea(aArea)
+        Return lRet
+    EndIf
+
+    ProcLogIni({}, "CICOMR01")
+    ProcLogAtu("INICIO")
+
+    cMsgAlt := ""
+    For nI := 1 To Len(aAlteracoes)
+        cMsgAlt += fTituloCampo(aAlteracoes[nI][1]) + " (" + aAlteracoes[nI][1] + "): " + ;
+            fDescValor(aAlteracoes[nI][1], aAlteracoes[nI][2]) + " -> " + ;
+            fDescValor(aAlteracoes[nI][1], aAlteracoes[nI][3]) + CRLF
+    Next nI
+
+    _cListaAlt := cMsgAlt
+
+    ProcLogAtu("MENSAGEM","INFO","Tentativa de alteracao de campos sensiveis do Fornecedor "+CRLF+;
+            "Fornecedor: " + Alltrim(SA2->A2_COD) + "/" + Alltrim(SA2->A2_LOJA) + CRLF + ;
+            cMsgAlt + ;
+            "Data/Hora: " + DtoC(Date()) + " " + Time() + CRLF +;
+            "Usuario Logado: " + cNomUsr;
+            )
+
+    // Solicita justificativa, senha e chave do usuario logado UMA UNICA VEZ,
+    // cobrindo todas as alteracoes de campos sensiveis desta edicao
+    @ 00,0 TO 470,350 DIALOG _oTela TITLE "Confirmacao de Alteracao de Dados do Fornecedor"
+        @ 08,02 SAY "Fornecedor: "
+        @ 08,35 SAY Alltrim(SA2->A2_COD) + "/" + Alltrim(SA2->A2_LOJA) + " - " + Alltrim(SA2->A2_NOME)
+        @ 18,02 SAY "Alteracoes (campo: valor atual -> valor novo):"
+        @ 24,02 GET _cListaAlt MEMO SIZE 150,40 WHEN .F.
+        @ 90,02 SAY "Justificativa da alteracao (obrigatoria):"
+        @ 100,02 GET _cJustif MEMO SIZE 150,50
+        @ 175,02 SAY "Redigite sua senha de login (" + cNomUsr + ") para confirmar:"
+        @ 185,02 SAY "Senha: "
+        @ 185,45 GET _cSenha PICTURE "@S40" VALID .T. PASSWORD Object oSenha
+        @ 200,02 SAY "Chave: "
+        @ 200,45 GET _cChave PICTURE "@S40" VALID .T. PASSWORD Object oChave
+        @ 220,060 BMPBUTTON TYPE 1 ACTION fConfirmaCICO()
+        @ 220,090 BUTTON "Auditoria" SIZE 35,11 ACTION PROCLOGVIEW()
+    ACTIVATE DIALOG _oTela CENTERED
+
+    If !_lOp
+        MsgStop("Operacao cancelada pelo usuario. Os campos alterados nao serao gravados.", "Cancelamento")
+        ProcLogAtu("MENSAGEM","FALHA","Operacao cancelada pelo usuario. Alteracoes nao efetivadas.")
+        ProcLogAtu("FIM")
+        RestArea(aArea)
+        Return .F.
+    EndIf
+
+    PswOrder(2)
+    If PswSeek(cNomUsr, .T.)
+        _aArray := PswRet()
+        If Alltrim(_aArray[1][3]) == Alltrim(_cSenha) .And. _cChaveOk == Alltrim(_cChave)
+            _lVl := .T.
+        ElseIf PSWNAME(Alltrim(_cSenha)) .And. _cChaveOk == Alltrim(_cChave)
+            _lVl := .T.
+        EndIf
+    EndIf
+
+    If !_lVl
+        MsgStop("Senha ou Chave incorreta. Os campos alterados nao serao gravados.", "Autenticacao")
+        ProcLogAtu("MENSAGEM","FALHA","Senha ou Chave incorreta informada pelo usuario " + cNomUsr + ". Alteracoes nao efetivadas.")
+        ProcLogAtu("FIM")
+        RestArea(aArea)
+        Return .F.
+    EndIf
+
+    cChaveForn := SA2->A2_FILIAL + SA2->A2_COD + SA2->A2_LOJA
+
+    // Validacao concluida uma unica vez: agora grava um registro de auditoria por campo alterado
+    For nI := 1 To Len(aAlteracoes)
+        U_ZTLGravaLog( "CICOMR01", "SA2", cChaveForn, aAlteracoes[nI][1], ;
+            aAlteracoes[nI][2] , ;
+            aAlteracoes[nI][3] , ;
+            Alltrim(_cJustif) )
+    Next nI
+
+    MsgInfo("Senha validada com sucesso. Alteracoes confirmadas.", "Autenticacao")
+    ProcLogAtu("MENSAGEM","SUCESSO","Senha validada. Alteracoes efetivadas: " + CRLF + cMsgAlt)
+    ProcLogAtu("FIM")
+
+    RestArea(aArea)
+
+Return lRet
+
+/*/{Protheus.doc} fConfirmaCICO
+Valida a obrigatoriedade da justificativa antes de permitir o
+fechamento do dialog de confirmacao de alteracao de campos sensiveis do fornecedor.
+@type function
+@author Pablo Regis
+@since 27/08/2026
+@return logical, ".T. se a justificativa foi informada e o dialog foi fechado"
+/*/
+Static Function fConfirmaCICO() as Logical
+
+    If Empty(AllTrim(_cJustif))
+        MsgAlert("Informe a justificativa da alteracao antes de confirmar.", "Atencao")
+        Return .F.
+    EndIf
+
+    _lOp := .T.
+    Close(_oTela)
+
+Return .T.
+
+/*/{Protheus.doc} fTituloCampo
+Retorna o titulo do campo diretamente do dicionario de dados (SX3), pelo nome do campo,
+sem mapeamento fixo no codigo. Usado nas mensagens de tela e de log do CICOMR01.
+@type function
+@author Pablo Regis
+@since 10/09/2026
+@param cCampo, character, "Nome do campo (ex.: 'A2_MSBLQL', 'A2_XSTATU')"
+@return character, "Titulo do campo (X3_TITULO do SX3); quando o campo nao e encontrado no dicionario, retorna o proprio nome do campo"
+/*/
+Static Function fTituloCampo(cCampo as Character) as Character
+
+    Local cAliasAnt := Alias()          as Character
+    Local cTitulo   := Alltrim(cCampo)  as Character
+
+    dbSelectArea("SX3")
+    dbSetOrder(2)
+    If dbSeek(Alltrim(cCampo))
+        cTitulo := Alltrim(X3Titulo())
+    EndIf
+
+    If !Empty(cAliasAnt)
+        dbSelectArea(cAliasAnt)
+    EndIf
+
+Return cTitulo
+
+/*/{Protheus.doc} fDescValor
+Retorna a descricao do valor de um campo diretamente do dicionario de dados (SX3),
+a partir da Lista de Opcoes do campo (X3_CBOX), via X3Combo(). Quando o campo nao possui
+combo configurado no dicionario ou o valor nao consta na lista, retorna o proprio valor bruto.
+@type function
+@author Pablo Regis
+@since 10/09/2026
+@param cCampo, character, "Nome do campo"
+@param cValor, character, "Conteudo do campo"
+@return character, "Descricao do valor conforme X3_CBOX do campo, ou o proprio valor bruto quando nao ha combo/descricao"
+/*/
+Static Function fDescValor(cCampo as Character, cValor )  as Character
+
+    Local cDesc := " " as Character
+
+    
+    If ValType(cValor) == "C" 
+        cDesc := Alltrim(X3Combo(cCampo, cValor)) 
+        
+        If Empty(cDesc)
+            cDesc := Alltrim(cValor)
+        EndIf
+    Else
+        If ValType(cValor) == "U"
+            cDesc := ""
+        ElseIf ValType(cValor) == "N"
+            cDesc := AllTrim(Str(cValor))
+        ElseIf ValType(cValor) == "D"
+            cDesc := DToC(cValor)
+        ElseIf ValType(cValor) == "L"
+            If cValor
+                cDesc := "Sim"
+            Else
+                cDesc := "Nao"
+            EndIf
+        Else
+            cDesc := cValToChar(cValor)   
+        EndIf    
+    EndIf
+
+Return cDesc

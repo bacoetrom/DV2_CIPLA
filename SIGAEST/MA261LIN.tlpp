@@ -1,0 +1,310 @@
+#include "tlpp-core.th"
+#include "totvs.ch"
+
+Static lMA261LinCfg := .F. as Logical
+Static cMA261ArmCQ  := "" as Character
+Static cMA261ArmApr := "" as Character
+Static cMA261GrpQA  := "" as Character
+
+/*/{Protheus.doc} MA261LIN
+Ponto de entrada de valida??o de linha da rotina MATA261 (Transfer?ncia
+entre Almoxarifados/Dep?sitos).
+
+Bloqueia movimenta??es de transfer?ncia (armaz?m de origem e/ou de destino)
+envolvendo os armaz?ns restritos de Controle de Qualidade ? Quarentena
+(par?metro MV_CQ) e Aprovado (par?metro MV_CQAPR) ? para usu?rios que n?o
+pertencem ao grupo "Garantia da Qualidade" (par?metro MV_GRPQA).
+
+Para os usu?rios do grupo, exige Assinatura Eletr?nica (senha do pr?prio
+usu?rio logado) e Justificativa antes de liberar a movimenta??o
+(ex.: Quarentena -> Aprovado).
+
+Acionado ao final das valida??es padr?o de linha, na fun??o A261LinOk(),
+antes da grava??o da linha em aCols.
+
+PARAMIXB:
+  [1] Numeric ? N?mero da linha corrente de aCols sendo validada (nLinha)
+
+@type user function
+@author Claude
+@since 23/07/2026
+@return Logical, .T. permite a movimenta??o da linha / .F. bloqueia
+@obs N?o executado dentro de Begin/End Transaction (valida??o ocorre durante
+a digita??o da grid, antes da grava??o). N?o adicionar prefixo U_ na
+declara??o da fun??o. Depende das vari?veis Private aCols/aHeader
+declaradas pela rotina padr?o MATA261.
+@see MATA261
+/*/
+User Function MA261LIN() as Logical
+
+	Local aParam as Array
+	Local nLinha as Numeric
+	Local lRet   := .T. as Logical
+
+	If Type("PARAMIXB") <> "A" .Or. Len(PARAMIXB) < 1
+		Return lRet
+	EndIf
+
+	aParam := PARAMIXB
+	nLinha := aParam[1]
+
+	Try
+		lRet := MA261VldArmRest(nLinha)
+	Catch oError
+		FWLogMsg("ERROR", , "MA261LIN", "MA261LIN", , "01", oError:Description, 0, 0, {})
+		lRet := .T.
+	EndTry
+
+Return lRet
+
+/*/{Protheus.doc} MA261VldArmRest
+Verifica se a linha de transfer?ncia envolve armaz?m restrito (Quarentena
+ou Aprovado) e aplica a regra de bloqueio/assinatura eletr?nica.
+@type static function
+@author Claude
+@since 23/07/2026
+@param nLinha, numeric, N?mero da linha corrente de aCols
+@return logical, .T. permite a opera??o, .F. bloqueia
+/*/
+Static Function MA261VldArmRest(nLinha as Numeric) as Logical
+
+	Local nPosArmOri := 4 as Numeric // Armaz?m Origem  (aCols) - mesma posi??o usada em A261LinOk/A261VldCod
+	Local nPosArmDes := 9 as Numeric // Armaz?m Destino (aCols) - mesma posi??o usada em A261LinOk/A261VldCod
+	Local cArmOri    := "" as Character
+	Local cArmDes    := "" as Character
+	Local lRet       := .T. as Logical
+
+	If ValType(aCols) <> "A" .Or. nLinha < 1 .Or. nLinha > Len(aCols)
+		Return .T.
+	EndIf
+	If ValType(aCols[nLinha]) <> "A" .Or. Len(aCols[nLinha]) < nPosArmDes
+		Return .T.
+	EndIf
+
+	MA261CarregaParam()
+
+	cArmOri := AllTrim(aCols[nLinha][nPosArmOri])
+	cArmDes := AllTrim(aCols[nLinha][nPosArmDes])
+
+	If !MA261ArmRestr(cArmOri) .And. !MA261ArmRestr(cArmDes)
+		Return .T.
+	EndIf
+
+	If !MA261UsrGQ()
+		MsgAlert("Movimentacao nao permitida: o armazem de origem ou de destino e restrito a Garantia da Qualidade.", "Transferencia - Armazem Restrito")
+		Return .F.
+	EndIf
+
+	lRet := MA261AssinaEle(cArmOri, cArmDes)
+
+Return lRet
+
+/*/{Protheus.doc} MA261CarregaParam
+Carrega (uma ?nica vez por sess?o) os par?metros de configura??o da regra:
+armaz?ns restritos e grupo de usu?rios "Garantia da Qualidade".
+@type static function
+@author Claude
+@since 23/07/2026
+@return Nil
+/*/
+Static Function MA261CarregaParam()
+
+	If !lMA261LinCfg
+		cMA261ArmCQ  := AllTrim(GetMvNNR("MV_CQ", "98"))
+		cMA261ArmApr := AllTrim(SuperGetMv("MV_CQAPR", .F., ""))
+		cMA261GrpQA  := AllTrim(SuperGetMv("MV_GRPQA", .F., ""))
+		lMA261LinCfg := .T.
+	EndIf
+
+Return Nil
+
+/*/{Protheus.doc} MA261ArmRestr
+Verifica se o armaz?m informado ? um dos armaz?ns restritos de Controle de
+Qualidade: Quarentena (MV_CQ) ou Aprovado (MV_CQAPR).
+@type static function
+@author Claude
+@since 23/07/2026
+@param cArmazem, character, C?digo do armaz?m avaliado
+@return logical, .T. se o armaz?m ? restrito
+/*/
+Static Function MA261ArmRestr(cArmazem as Character) as Logical
+
+	If Empty(cArmazem)
+		Return .F.
+	EndIf
+
+Return (!Empty(cMA261ArmCQ) .And. cArmazem == cMA261ArmCQ) .Or. ;
+       (!Empty(cMA261ArmApr) .And. cArmazem == cMA261ArmApr)
+
+/*/{Protheus.doc} MA261UsrGQ
+Verifica se o usu?rio logado pertence ao grupo "Garantia da Qualidade",
+definido pelo c?digo de grupo do Configurador informado no par?metro
+MV_GRPQA. Se o par?metro n?o estiver configurado, nenhum usu?rio ?
+considerado pertencente ao grupo (comportamento seguro por padr?o).
+@type static function
+@author Claude
+@since 23/07/2026
+@return logical, .T. se o usu?rio pertence ao grupo
+/*/
+Static Function MA261UsrGQ() as Logical
+
+	Local cCodUsr := RetCodUsr() as Character
+	Local cNomUsr := "" as Character
+	Local aGrupos as Array
+
+	If Empty(cMA261GrpQA)
+		Return .F.
+	EndIf
+
+	cNomUsr := UsrRetName(cCodUsr)
+	aGrupos := UsrRetGrp(cNomUsr, cCodUsr)
+
+	If ValType(aGrupos) <> "A"
+		Return .F.
+	EndIf
+
+Return (AScan(aGrupos, {|cGrp| AllTrim(cGrp) == cMA261GrpQA}) > 0)
+
+/*/{Protheus.doc} MA261AssinaEle
+Exibe dialogo unico de Assinatura Eletronica com os campos Justificativa e
+Senha lado a lado (mesmo layout do fonte de referencia CICOMR01.tlpp),
+exigindo a senha do proprio usuario logado antes de liberar a movimentacao
+de transferencia envolvendo armazem restrito. Grava o log de auditoria na
+tabela ZTL via U_ZTLGravaLog() (mesmo motor generico usado por CICOMR01,
+ver ZTLU001.tlpp) quando confirmado.
+@obs Nao ha, neste ponto de entrada, um alias de cabecalho (equivalente a
+SC5 no MATA410) disponivel para compor uma chave de documento, nem a
+confirmacao de qual tabela fisica a rotina padrao MATA261 efetivamente
+grava. A chave usa o par origem->destino da propria linha (cArmOri/
+cArmDes), e "MATA261" e usado como identificador de origem (em vez de um
+alias de tabela fisica nao validado) no parametro cTabela de
+U_ZTLGravaLog. Ajustar caso a tabela/chave reais sejam confirmadas.
+@type static function
+@author Claude
+@since 23/07/2026
+@param cArmOri, character, Armaz?m de origem da linha
+@param cArmDes, character, Armaz?m de destino da linha
+@return logical, .T. se a assinatura e a justificativa foram confirmadas
+/*/
+Static Function MA261AssinaEle(cArmOri as Character, cArmDes as Character) as Logical
+
+	Local oDlg       as Object
+	Local oGetSenha  as Object
+	Local oGetJust   as Object
+	Local cSenha     := Space(20)  as Character
+	Local cJustif    := Space(200) as Character
+	Local cUsuario   := AllTrim(RetCodUsr()) + " - " + AllTrim(UsrRetName(RetCodUsr())) as Character
+	Local lConfirma  := .F. as Logical
+
+	DEFINE MSDIALOG oDlg TITLE "Assinatura Eletronica - Armazem Restrito" FROM 000,000 TO 250,550 PIXEL
+
+		@ 008,008 SAY "Usuario logado" SIZE 180,008 OF oDlg PIXEL
+		@ 018,008 SAY cUsuario SIZE 180,008 OF oDlg PIXEL
+
+		@ 034,008 SAY "Justificativa" SIZE 180,008 OF oDlg PIXEL
+		@ 044,008 GET oGetJust VAR cJustif MEMO SIZE 180,050 OF oDlg PIXEL
+
+		@ 100,008 SAY "Senha" SIZE 180,008 OF oDlg PIXEL
+		@ 110,008 MSGET oGetSenha VAR cSenha SIZE 180,010 PASSWORD OF oDlg PIXEL
+
+		DEFINE SBUTTON FROM 130,220 TYPE 1 ENABLE OF oDlg ACTION (lConfirma := MA261VldAssEl(cSenha, cJustif), MA261FechaDlg(oDlg,lConfirma))
+		DEFINE SBUTTON FROM 130,255 TYPE 2 ENABLE OF oDlg ACTION (lConfirma := .F., oDlg:End())
+
+	ACTIVATE MSDIALOG oDlg CENTERED
+
+	If lConfirma
+		U_ZTLGravaLog("MA261LIN", "MATA261", cArmOri + "->" + cArmDes, "ARMAZEM", cArmOri, cArmDes, AllTrim(cJustif))
+	EndIf
+
+Return lConfirma
+
+/*/{Protheus.doc} MA261FechaDlg
+Fecha o di?logo de Assinatura Eletr?nica quando a confirma??o (senha e
+justificativa) ? v?lida.
+@type static function
+@author Claude
+@since 23/07/2026
+@param oDlg, object, Di?logo de Assinatura Eletr?nica
+@param lFechar, logical, .T. fecha o di?logo
+@return Nil
+/*/
+Static Function MA261FechaDlg(oDlg as Object, lFechar as Logical)
+
+	If lFechar
+		oDlg:End()
+	EndIf
+
+Return Nil
+
+/*/{Protheus.doc} MA261VldAssEl
+Valida a obrigatoriedade da senha e da justificativa digitadas no dialogo
+de Assinatura Eletronica (layout igual ao CICOMR01.tlpp).
+@type static function
+@author Claude
+@since 23/07/2026
+@param cSenha, character, Senha digitada pelo usu?rio
+@param cJustif, character, Justificativa digitada pelo usu?rio
+@return logical, .T. se senha e justificativa sao validas
+/*/
+Static Function MA261VldAssEl(cSenha as Character, cJustif as Character) as Logical
+
+	Local lRet := .T. as Logical
+
+	If Empty(AllTrim(cJustif))
+		MsgAlert("Informe a justificativa da movimentacao.", "Assinatura Eletronica - Armazem Restrito")
+		Return .F.
+	EndIf
+
+	If Empty(AllTrim(cSenha))
+		MsgAlert("Informe a senha para confirmar.", "Assinatura Eletronica - Armazem Restrito")
+		Return .F.
+	EndIf
+
+	If !MA261VldSenha(cSenha)
+		MsgAlert("Senha invalida.", "Assinatura Eletronica - Armazem Restrito")
+		lRet := .F.
+	EndIf
+
+Return lRet
+
+/*/{Protheus.doc} MA261VldSenha
+Valida a senha digitada do proprio usuario logado (RetCodUsr()), sem abrir
+nenhuma tela adicional, atraves de um login silencioso via RpcSetEnv() na
+mesma empresa/filial correntes (cEmpAnt/cFilAnt), seguido de RpcClearEnv()
+imediato.
+
+Nao usa mais PswOrder/PswSeek/PswName: a partir do Protheus 11 a funcao
+PswSeek() deixou de validar senha (falha de seguranca corrigida pela
+TOTVS), entao aquele trio de funcoes nao bloqueia mais senha incorreta.
+Tambem nao usa FWAuthUser() porque essa funcao sempre abre sua propria
+tela de usuario/senha e nao aceita uma senha ja digitada em outro campo -
+inviavel para o layout de campo unico usado aqui (igual ao CICOMR01.tlpp).
+
+@obs ATENCAO: RpcSetEnv() foi projetado para abertura de ambiente em
+rotinas automaticas (jobs/schedulers), nao para ser chamado no meio de uma
+sessao interativa ja em edicao (MATA261 com aCols/aHeader abertos). Os
+parametros lAbend/lOpenSX/lConnect sao passados como .F. para minimizar
+efeitos colaterais (nao reabre dicionario, nao forca nova conexao), mas o
+risco de impacto no ambiente/aliases correntes da sessao NAO esta 100%
+eliminado. Recomenda-se testar exaustivamente em homologacao antes de
+subir para producao.
+@type static function
+@author Claude
+@since 23/07/2026
+@param cSenha, character, Senha digitada pelo usuario a validar
+@return logical, .T. se a senha do usuario logado esta correta
+/*/
+Static Function MA261VldSenha(cSenha as Character) as Logical
+
+	Local cUserAtual := RetCodUsr() as Character
+	Local lRet        := .F. as Logical
+
+	Try
+		lRet := RpcSetEnv(cEmpAnt, cFilAnt, cUserAtual, cSenha, , , , , .F., .F., .F.)
+	Catch oErro
+		lRet := .F.
+	EndTry
+
+	RpcClearEnv()
+
+Return lRet

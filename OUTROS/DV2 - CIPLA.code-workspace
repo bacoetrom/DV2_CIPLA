@@ -1,0 +1,22 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../.claude"
+		},
+		{
+			"path": "../SIGACOM"
+		},
+		{
+			"path": "../SIGAEST"
+		}
+	],
+	"settings": {
+		"totvsLanguageServer.welcomePage": false,
+		"totvsLanguageServer.editor.linter.includes": "C:\\99 - Fontes\\include_2410",
+		"advpl.environments": [],
+		"advpl.selectedEnvironment": "Selecione o Ambiente"
+	}
+}

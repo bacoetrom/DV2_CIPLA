@@ -1,0 +1,305 @@
+#include "tlpp-core.th"
+#include "totvs.ch"
+
+Static lA261TKCfg  := .F. as Logical
+Static cA261TKArmCQ  := "" as Character
+Static cA261TKArmApr := "" as Character
+Static cA261TKGrpQA  := "" as Character
+
+/*/{Protheus.doc} A261TOK
+Ponto de entrada de valida??o "Tudo Ok" da linha da rotina MATA261
+(Transfer?ncia entre Almoxarifados/Dep?sitos).
+
+Bloqueia movimenta??es de transfer?ncia (armaz?m de origem e/ou de destino)
+envolvendo os armaz?ns restritos de Controle de Qualidade ? Quarentena
+(par?metro MV_CQ) e Aprovado (par?metro MV_CQAPR) ? para usu?rios que n?o
+pertencem ao grupo "Garantia da Qualidade" (par?metro MV_GRPQA).
+
+Para os usu?rios do grupo, exige Assinatura Eletr?nica (senha do pr?prio
+usu?rio logado) e Justificativa antes de liberar a movimenta??o
+(ex.: Quarentena -> Aprovado).
+
+Acionado pela fun??o padr?o a261TudoOk(), ?ltimo gate de valida??o da linha
+corrente antes dela ser efetivamente incorporada a aCols (callback "TudoOk"
+do MSGetDados criado em Mata261()).
+
+PARAMIXB:
+  N?o recebido ? o ExecBlock("A261TOK",.F.,.F.) padr?o n?o envia array de
+  par?metros. A linha corrente ? obtida pela vari?vel Private "n", herdada
+  da mesma forma que a pr?pria a261TudoOk() faz (Default nLinha := n).
+
+@type user function
+@author Claude
+@since 24/07/2026
+@return Logical, .T. permite a movimenta??o da linha / .F. bloqueia
+@obs N?o executado dentro de Begin/End Transaction (valida??o ocorre durante
+a digita??o da grid, antes da grava??o). N?o adicionar prefixo U_ na
+declara??o da fun??o. Depende das vari?veis Private aCols/aHeader/n
+declaradas pela rotina padr?o MATA261.
+@see MATA261
+/*/
+User Function A261TOK() as Logical
+
+	Local nLinha := n as Numeric
+	Local lRet   := .T. as Logical
+
+	Try
+		lRet := A261TKVldArmRest(nLinha)
+	Catch oError
+		FWLogMsg("ERROR", , "A261TOK", "A261TOK", , "01", oError:Description, 0, 0, {})
+		lRet := .T.
+	EndTry
+
+Return lRet
+
+/*/{Protheus.doc} A261TKVldArmRest
+Verifica se a linha de transfer?ncia envolve armaz?m restrito (Quarentena
+ou Aprovado) e aplica a regra de bloqueio/assinatura eletr?nica.
+@type static function
+@author Claude
+@since 24/07/2026
+@param nLinha, numeric, N?mero da linha corrente de aCols
+@return logical, .T. permite a opera??o, .F. bloqueia
+/*/
+Static Function A261TKVldArmRest(nLinha as Numeric) as Logical
+
+	Local nPosArmOri := 4 as Numeric // Armaz?m Origem  (aCols) - mesma posi??o usada em a261TudoOk/A261LinOk/A261VldCod
+	Local nPosArmDes := 9 as Numeric // Armaz?m Destino (aCols) - mesma posi??o usada em a261TudoOk/A261LinOk/A261VldCod
+	Local cArmOri    := "" as Character
+	Local cArmDes    := "" as Character
+	Local lRet       := .T. as Logical
+
+	If ValType(aCols) <> "A" .Or. nLinha < 1 .Or. nLinha > Len(aCols)
+		Return .T.
+	EndIf
+	If ValType(aCols[nLinha]) <> "A" .Or. Len(aCols[nLinha]) < nPosArmDes
+		Return .T.
+	EndIf
+
+	A261TKCarregaParam()
+
+	cArmOri := AllTrim(aCols[nLinha][nPosArmOri])
+	cArmDes := AllTrim(aCols[nLinha][nPosArmDes])
+
+	If !A261TKArmRestr(cArmOri) .And. !A261TKArmRestr(cArmDes)
+		Return .T.
+	EndIf
+
+	If !A261TKUsrGQ()
+		MsgAlert("Movimentacao nao permitida: o armazem de origem ou de destino e restrito a Garantia da Qualidade.", "Transferencia - Armazem Restrito")
+		Return .F.
+	EndIf
+
+	lRet := A261TKAssinaEle(cArmOri, cArmDes)
+
+Return lRet
+
+/*/{Protheus.doc} A261TKCarregaParam
+Carrega (uma ?nica vez por sess?o) os par?metros de configura??o da regra:
+armaz?ns restritos e grupo de usu?rios "Garantia da Qualidade".
+@type static function
+@author Claude
+@since 24/07/2026
+@return Nil
+/*/
+Static Function A261TKCarregaParam()
+
+	If !lA261TKCfg
+		cA261TKArmCQ  := AllTrim(GetMvNNR("MV_CQ", "98"))
+		cA261TKArmApr := AllTrim(SuperGetMv("MV_CQAPR", .F., ""))
+		cA261TKGrpQA  := AllTrim(SuperGetMv("MV_GRPQA", .F., ""))
+		lA261TKCfg := .T.
+	EndIf
+
+Return Nil
+
+/*/{Protheus.doc} A261TKArmRestr
+Verifica se o armaz?m informado ? um dos armaz?ns restritos de Controle de
+Qualidade: Quarentena (MV_CQ) ou Aprovado (MV_CQAPR).
+@type static function
+@author Claude
+@since 24/07/2026
+@param cArmazem, character, C?digo do armaz?m avaliado
+@return logical, .T. se o armaz?m ? restrito
+/*/
+Static Function A261TKArmRestr(cArmazem as Character) as Logical
+
+	If Empty(cArmazem)
+		Return .F.
+	EndIf
+
+Return (!Empty(cA261TKArmCQ) .And. cArmazem == cA261TKArmCQ) .Or. ;
+       (!Empty(cA261TKArmApr) .And. cArmazem == cA261TKArmApr)
+
+/*/{Protheus.doc} A261TKUsrGQ
+Verifica se o usu?rio logado pertence ao grupo "Garantia da Qualidade",
+definido pelo c?digo de grupo do Configurador informado no par?metro
+MV_GRPQA. Se o par?metro n?o estiver configurado, nenhum usu?rio ?
+considerado pertencente ao grupo (comportamento seguro por padr?o).
+@type static function
+@author Claude
+@since 24/07/2026
+@return logical, .T. se o usu?rio pertence ao grupo
+/*/
+Static Function A261TKUsrGQ() as Logical
+
+	Local cCodUsr := RetCodUsr() as Character
+	Local cNomUsr := "" as Character
+	Local aGrupos as Array
+
+	If Empty(cA261TKGrpQA)
+		Return .F.
+	EndIf
+
+	cNomUsr := UsrRetName(cCodUsr)
+	aGrupos := UsrRetGrp(cNomUsr, cCodUsr)
+
+	If ValType(aGrupos) <> "A"
+		Return .F.
+	EndIf
+
+Return (AScan(aGrupos, {|cGrp| AllTrim(cGrp) == cA261TKGrpQA}) > 0)
+
+/*/{Protheus.doc} A261TKAssinaEle
+Exibe dialogo unico de Assinatura Eletronica com os campos Justificativa e
+Senha lado a lado (mesmo layout do fonte de referencia CICOMR01.tlpp),
+exigindo a senha do proprio usuario logado antes de liberar a movimentacao
+de transferencia envolvendo armazem restrito. Grava o log de auditoria na
+tabela ZTL via U_ZTLGravaLog() (mesmo motor generico usado por CICOMR01,
+ver ZTLU001.tlpp) quando confirmado.
+@obs Nao ha, neste ponto de entrada, um alias de cabecalho (equivalente a
+SC5 no MATA410) disponivel para compor uma chave de documento, nem a
+confirmacao de qual tabela fisica (SD3? outra?) a rotina padrao MATA261
+efetivamente grava. A chave usa o par origem->destino da propria linha
+(cArmOri/cArmDes), e "MATA261" e usado como identificador de origem (em
+vez de um alias de tabela fisica nao validado) no parametro cTabela de
+U_ZTLGravaLog. Ajustar caso a tabela/chave reais sejam confirmadas.
+@type static function
+@author Claude
+@since 24/07/2026
+@param cArmOri, character, Armaz?m de origem da linha
+@param cArmDes, character, Armaz?m de destino da linha
+@return logical, .T. se a assinatura e a justificativa foram confirmadas
+/*/
+Static Function A261TKAssinaEle(cArmOri as Character, cArmDes as Character) as Logical
+
+	Local oDlg       as Object
+	Local oGetSenha  as Object
+	Local oGetJust   as Object
+	Local cSenha     := Space(20)  as Character
+	Local cJustif    := Space(200) as Character
+	Local cUsuario   := AllTrim(RetCodUsr()) + " - " + AllTrim(UsrRetName(RetCodUsr())) as Character
+	Local lConfirma  := .F. as Logical
+
+	DEFINE MSDIALOG oDlg TITLE "Assinatura Eletronica - Armazem Restrito" FROM 000,000 TO 220,450 PIXEL
+
+		@ 008,008 SAY "Usuario logado" SIZE 180,008 OF oDlg PIXEL
+		@ 018,008 SAY cUsuario SIZE 180,008 OF oDlg PIXEL
+
+		@ 034,008 SAY "Justificativa" SIZE 180,008 OF oDlg PIXEL
+		@ 044,008 GET oGetJust VAR cJustif MEMO SIZE 180,050 OF oDlg PIXEL
+
+		@ 100,008 SAY "Senha" SIZE 180,008 OF oDlg PIXEL
+		@ 110,008 MSGET oGetSenha VAR cSenha SIZE 180,010 PASSWORD OF oDlg PIXEL
+
+		DEFINE SBUTTON FROM 130,220 TYPE 1 ENABLE OF oDlg ACTION (lConfirma := A261TKVldAssEl(cSenha, cJustif), A261TKFechaDlg(oDlg,lConfirma))
+		DEFINE SBUTTON FROM 130,255 TYPE 2 ENABLE OF oDlg ACTION (lConfirma := .F., oDlg:End())
+
+	ACTIVATE MSDIALOG oDlg CENTERED
+
+	If lConfirma
+		U_ZTLGravaLog("A261TOK", "MATA261", cArmOri + "->" + cArmDes, "ARMAZEM", cArmOri, cArmDes, AllTrim(cJustif))
+	EndIf
+
+Return lConfirma
+
+/*/{Protheus.doc} A261TKFechaDlg
+Fecha o di?logo de Assinatura Eletr?nica quando a confirma??o (senha e
+justificativa) ? v?lida.
+@type static function
+@author Claude
+@since 24/07/2026
+@param oDlg, object, Di?logo de Assinatura Eletr?nica
+@param lFechar, logical, .T. fecha o di?logo
+@return Nil
+/*/
+Static Function A261TKFechaDlg(oDlg as Object, lFechar as Logical)
+
+	If lFechar
+		oDlg:End()
+	EndIf
+
+Return Nil
+
+/*/{Protheus.doc} A261TKVldAssEl
+Valida a obrigatoriedade da senha e da justificativa digitadas no dialogo
+de Assinatura Eletronica (layout igual ao CICOMR01.tlpp).
+@type static function
+@author Claude
+@since 24/07/2026
+@param cSenha, character, Senha digitada pelo usu?rio
+@param cJustif, character, Justificativa digitada pelo usu?rio
+@return logical, .T. se senha e justificativa sao validas
+/*/
+Static Function A261TKVldAssEl(cSenha as Character, cJustif as Character) as Logical
+
+	Local lRet := .T. as Logical
+
+	If Empty(AllTrim(cJustif))
+		MsgAlert("Informe a justificativa da movimentacao.", "Assinatura Eletronica - Armazem Restrito")
+		Return .F.
+	EndIf
+
+	If Empty(AllTrim(cSenha))
+		MsgAlert("Informe a senha para confirmar.", "Assinatura Eletronica - Armazem Restrito")
+		Return .F.
+	EndIf
+
+	If !A261TKVldSenha(cSenha)
+		MsgAlert("Senha invalida.", "Assinatura Eletronica - Armazem Restrito")
+		lRet := .F.
+	EndIf
+
+Return lRet
+
+/*/{Protheus.doc} A261TKVldSenha
+Valida a senha digitada do proprio usuario logado (RetCodUsr()), sem abrir
+nenhuma tela adicional, atraves de um login silencioso via RpcSetEnv() na
+mesma empresa/filial correntes (cEmpAnt/cFilAnt), seguido de RpcClearEnv()
+imediato.
+
+Nao usa mais PswOrder/PswSeek/PswName: a partir do Protheus 11 a funcao
+PswSeek() deixou de validar senha (falha de seguranca corrigida pela
+TOTVS), entao aquele trio de funcoes nao bloqueia mais senha incorreta.
+Tambem nao usa FWAuthUser() porque essa funcao sempre abre sua propria
+tela de usuario/senha e nao aceita uma senha ja digitada em outro campo -
+inviavel para o layout de campo unico usado aqui (igual ao CICOMR01.tlpp).
+
+@obs ATENCAO: RpcSetEnv() foi projetado para abertura de ambiente em
+rotinas automaticas (jobs/schedulers), nao para ser chamado no meio de uma
+sessao interativa ja em edicao (MATA261 com aCols/aHeader abertos). Os
+parametros lAbend/lOpenSX/lConnect sao passados como .F. para minimizar
+efeitos colaterais (nao reabre dicionario, nao forca nova conexao), mas o
+risco de impacto no ambiente/aliases correntes da sessao NAO esta 100%
+eliminado. Recomenda-se testar exaustivamente em homologacao antes de
+subir para producao.
+@type static function
+@author Claude
+@since 24/07/2026
+@param cSenha, character, Senha digitada pelo usuario a validar
+@return logical, .T. se a senha do usuario logado esta correta
+/*/
+Static Function A261TKVldSenha(cSenha as Character) as Logical
+
+	Local cUserAtual := RetCodUsr() as Character
+	Local lRet        := .F. as Logical
+
+	Try
+		lRet := RpcSetEnv(cEmpAnt, cFilAnt, cUserAtual, cSenha, , , , , .F., .F., .F.)
+	Catch oErro
+		lRet := .F.
+	EndTry
+
+	RpcClearEnv()
+
+Return lRet

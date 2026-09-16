@@ -1,0 +1,113 @@
+#INCLUDE 'TOTVS.CH'
+#INCLUDE 'TBICONN.CH'
+
+/*/{Protheus.doc} MDIOk
+description
+@type function
+@version  
+@author Pablo Regis
+@since 4/29/2026
+@return variant, return_description
+/*/
+User Function MDIOk()
+	Local cPasta 	:= GetTempPath(.T.) + "totvsprinter\"
+
+	If !ExistDir(cPasta)
+		MakeDir(cPasta)
+	EndIf
+
+	
+	// If FwIsAdmin()
+		SetKey( K_CTRL_F12,  {|| ProtectMdi("U_PXRUNPRG()") } )
+	// EndIf
+	
+Return
+
+/*/{Protheus.doc} ProtectMdi
+
+	Protege a execução de rotina na TRHEAD do MAIN pois a mesma não reabre as SX's quando troca de empresa.
+
+	@author  Robson Rogério Silva
+	@since   24-01-2019
+/*/
+
+Static Function ProtectMdi(cPrograma)
+	Local aDicionarios := RetSxs()
+	Local nI
+
+	For nI := 1 To Len(aDicionarios)
+		If( Select(aDicionarios[ni][1]) > 0)
+			(aDicionarios[ni][1])->(DbCloseArea())
+		EndIf
+	Next nI
+
+	MsgRun("Preparando ambiente.","Aguarde...", { || aEVal(aDicionarios, {|x| DbSelectArea(x[1])}) })
+
+Return &cPrograma
+
+/*/{Protheus.doc} PXRUNPRG
+description
+@type function
+@version  
+@author Pablo Regis
+@since 4/29/2026
+@return variant, return_description
+/*/
+User Function PXRUNPRG()
+	Local cPrograma	:= SPACE(250)//GetMv("LD_PROG") + SPACE(250)
+	Local lLogin    := Type("cEmpAnt") != "U"
+	Local aPergs := {}
+
+	If ! lLogin
+		PREPARE ENVIRONMENT EMPRESA "99" FILIAL "01"
+	EndIf
+
+	aAdd( aPergs ,{1,"Nome da Função"       , cPrograma                    ,,'.T.',"" ,'.T.',60, .T.})
+	aAdd( aPergs ,{4,"Protege execução"  , .T.,"Protege execução",85,,})
+	if ParamBox( @aPergs , "Processa FUNCAO" , NIL , NIL , NIL , .T. )
+		RodaPrg(AllTrim(MV_PAR01))
+	EndIf
+
+
+Return
+
+/*/{Protheus.doc} RodaPrg
+
+	Executa o programa recebido.
+
+	@author  Robson Rogério
+	@since   17-01-2019
+/*/
+
+Static Function RodaPrg(cPrograma)
+	Local cFunName		:= FunName()
+	Local aRotOld		:= If(Type("aRotina") == "A" ,aClone(aRotina), nil)
+	Local cProgramaOld  := ""
+	Local nPos          := At("(",cPrograma)
+	// Salva bloco de código do tratamento de erro
+	Local oError 		:= ErrorBlock({|e| MsgAlert("Mensagem de Erro: " + CRLF + e:Description, "MDIOK.prw")})
+
+	cProgramaOld  := cPrograma
+	//monta o FunName que precisa para rodar
+	cPrograma   := SubStr(cPrograma,1,nPos-1)
+	// verifica se tem U_ e tira tbm
+	If UPPER(SubStr(cPrograma,1,2)) == "U_"
+		cPrograma :=SubStr(cPrograma,3)
+	EndIf
+
+	SetFunName(cPrograma)
+
+	If MV_PAR02
+		&cProgramaOld
+		ErrorBlock(oError)
+	Else
+		ErrorBlock(oError)
+		&cProgramaOld
+	EndIf
+
+	SetFunName(cFunName)
+
+	If ! Empty(aRotOld)
+		aRotina	:= aClone(aRotOld)
+	EndIf
+Return
