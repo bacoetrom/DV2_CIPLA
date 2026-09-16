@@ -1,6 +1,7 @@
 #include "tlpp-core.th"
-#include "totvs.ch"
-
+#INCLUDE 'rwmake.ch'
+#INCLUDE 'topconn.ch'
+#INCLUDE "TBICONN.CH"
 #DEFINE CRLF Chr(13)+Chr(10)
 
 //-------------------------------------------------------------------
@@ -236,16 +237,26 @@ Method Confirma() as Logical Class ZTLAssinaEletronica
 
     // Dialogo montado com os mesmos comandos classicos (@ .. DIALOG / @ .. GET /
     // BMPBUTTON / BUTTON / ACTIVATE DIALOG) usados como base em CICOMR01.tlpp.
-    // Esses comandos classicos (sistema de Get) so podem ficar dentro de uma
-    // Function/Static Function, nunca dentro do corpo de um Method de classe -
-    // por isso o dialogo inteiro fica na Static Function fMostraDlgZTLAssEle(),
-    // logo abaixo. O GET classico tambem exige memvar (Private/Public) ligada
-    // por nome, por isso os campos de tela usam as Privates acima (nao
-    // ::atributo). Pelo mesmo motivo, a acao do BMPBUTTON de confirmacao
-    // delega para a Static Function fConfirmaZTLAssEle(), no mesmo padrao do
-    // fConfirmaCICO() do CICOMR01, que aciona a instancia guardada em
-    // _oSelfAssEle
-    fMostraDlgZTLAssEle(cTituloDlg, cRegistro, cNomUsr)
+    // O GET classico exige memvar (Private/Public/Local) ligada por nome, por
+    // isso os campos de tela usam as Privates acima (nao ::atributo). Pelo
+    // mesmo motivo, a acao do BMPBUTTON de confirmacao delega para a Static
+    // Function fConfirmaZTLAssEle(), no mesmo padrao do fConfirmaCICO() do
+    // CICOMR01, que aciona a instancia guardada em _oSelfAssEle
+    @ 00,0 TO 470,350 DIALOG _oDlgAssEle TITLE cTituloDlg
+        @ 08,02 SAY "Registro: "
+        @ 08,35 SAY cRegistro
+        @ 18,02 SAY "Alteracoes (campo: valor atual -> valor novo):"
+        @ 24,02 GET _cListaAltAssEle MEMO SIZE 150,40 WHEN .F.
+        @ 90,02 SAY "Justificativa da alteracao (obrigatoria):"
+        @ 100,02 GET _cJustifAssEle MEMO SIZE 150,50
+        @ 175,02 SAY "Redigite sua senha de login (" + cNomUsr + ") para confirmar:"
+        @ 185,02 SAY "Senha: "
+        @ 185,45 GET _cSenhaAssEle PICTURE "@S40" VALID .T. PASSWORD Object oSenhaAssEle
+        @ 200,02 SAY "Chave: "
+        @ 200,45 GET _cChaveAssEle PICTURE "@S40" VALID .T. PASSWORD Object oChaveAssEle
+        @ 220,060 BMPBUTTON TYPE 1 ACTION fConfirmaZTLAssEle()
+        @ 220,090 BUTTON "Auditoria" SIZE 35,11 ACTION PROCLOGVIEW()
+    ACTIVATE DIALOG _oDlgAssEle CENTERED
 
     If !_lOpAssEle
         MsgStop("Operacao cancelada, ou Senha/Chave/Justificativa invalidas. As alteracoes nao serao gravadas.", "Cancelamento")
@@ -517,43 +528,6 @@ Method GravaLog() as Logical Class ZTLAssinaEletronica
     Next nI
 
 Return lRet
-
-/*/{Protheus.doc} fMostraDlgZTLAssEle
-Monta e exibe o dialogo classico de Assinatura Eletronica (@ .. DIALOG /
-@ .. GET / BMPBUTTON / BUTTON / ACTIVATE DIALOG), no mesmo padrao usado
-como base em CICOMR01.tlpp. Existe como Static Function (fora da classe)
-porque os comandos classicos do sistema de Get nao podem ficar dentro do
-corpo de um Method de classe; os campos de tela ficam ligados as Privates
-declaradas em ZTLAssinaEletronica:Confirma() (_oDlgAssEle,
-_cListaAltAssEle, _cJustifAssEle, _cSenhaAssEle, _cChaveAssEle), que
-permanecem visiveis aqui por serem memvars Private.
-@type function
-@author Pablo Regis
-@since 16/09/2026
-@param cTituloDlg, character, "Titulo da janela de confirmacao"
-@param cRegistro, character, "Identificacao do registro exibida no topo do dialogo (tabela - chave)"
-@param cNomUsr, character, "Nome do usuario logado, exibido no rotulo do campo Senha"
-@return nil
-/*/
-Static Function fMostraDlgZTLAssEle(cTituloDlg as Character, cRegistro as Character, cNomUsr as Character)
-
-    @ 00,0 TO 470,350 DIALOG _oDlgAssEle TITLE (cTituloDlg)
-        @ 08,02 SAY "Registro: "
-        @ 08,35 SAY cRegistro
-        @ 18,02 SAY "Alteracoes (campo: valor atual -> valor novo):"
-        @ 24,02 GET _cListaAltAssEle MEMO SIZE 150,40 WHEN .F.
-        @ 90,02 SAY "Justificativa da alteracao (obrigatoria):"
-        @ 100,02 GET _cJustifAssEle MEMO SIZE 150,50
-        @ 175,02 SAY "Redigite sua senha de login (" + cNomUsr + ") para confirmar:"
-        @ 185,02 SAY "Senha: "
-        @ 185,45 GET _cSenhaAssEle PICTURE "@S40" VALID .T. PASSWORD Object oSenhaAssEle
-        @ 200,02 SAY "Chave: "
-        @ 200,45 GET _cChaveAssEle PICTURE "@S40" VALID .T. PASSWORD Object oChaveAssEle
-        @ 220,060 BMPBUTTON TYPE 1 ACTION fConfirmaZTLAssEle()
-        @ 220,090 BUTTON "Auditoria" SIZE 35,11 ACTION PROCLOGVIEW()
-    ACTIVATE DIALOG _oDlgAssEle CENTERED
-
-Return
 
 /*/{Protheus.doc} fConfirmaZTLAssEle
 Valida a obrigatoriedade da Justificativa, a Senha de login e a Chave
