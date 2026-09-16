@@ -1,0 +1,28 @@
+# === TOTVS Language Server / VS Code (AdvPL/TLPP) ===
+.vscode/.cache/
+.vscode/.linter/
+.vscode/.advpl/
+.vscode/*.log
+
+# === Objetos compilados (RDMake / AppServer) ===
+*.o
+*.O
+*.ppo
+*.PPO
+*.obj
+
+# === Logs e arquivos temporários ===
+*.log
+*.tmp
+*.bak
+*.old
+~$*
+
+# === Empacotamento / patches gerados ===
+*.rpo
+*.patch.zip
+
+# === Sistema operacional ===
+Thumbs.db
+desktop.ini
+.DS_Store
