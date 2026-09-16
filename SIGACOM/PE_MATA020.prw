@@ -20,11 +20,11 @@ User Function CUSTOMERVENDOR()
     Local oModel       := FwModelActive()
     Local nOpc
     Local aCampSens    := {"A2_MSBLQL", "A2_XSTATU"}
-    Local aAlteracoes  := {}
     Local cCampoAtu    := ""
     Local xValorAnt    := Nil
     Local xValorNovo   := Nil
     Local nX           := 0
+    Local oAssEle      as Object
 
     If aParam <> NIL
         oObj     := aParam[1]
@@ -40,21 +40,21 @@ User Function CUSTOMERVENDOR()
             ElseIf cIdPonto == "FORMPOS"
                 If oModel <> NIL    .And.  nOpc == MODEL_OPERATION_UPDATE
 
-                    aAlteracoes := {}
+                    oAssEle := ZTLAssinaEletronica():New("CUSTOMERVENDOR", "SA2", SA2->A2_FILIAL + SA2->A2_COD + SA2->A2_LOJA)
+                    oAssEle:SetParamChave("FS_CICOMR01")
+
                     For nX := 1 To Len(aCampSens)
                         cCampoAtu  := aCampSens[nX]
                         xValorAnt  := SA2->(FieldGet(FieldPos(cCampoAtu)))
                         xValorNovo := oModel:GetModel("SA2MASTER"):GetValue(cCampoAtu)
                         If xValorNovo <> xValorAnt
-                            aAdd(aAlteracoes, {cCampoAtu, xValorAnt, xValorNovo})
+                            oAssEle:AddAlteracao(cCampoAtu, xValorAnt, xValorNovo)
                         EndIf
                     Next nX
 
-                    If Len(aAlteracoes) > 0
-                        xRet := U_CICOMR01(aAlteracoes)
-                        If xRet == .F.
-                            FWAlertWarning("Usuario sem permissao de alterar dados sensiveis do fornecedor!")
-                        EndIf
+                    xRet := oAssEle:Confirma()
+                    If xRet == .F.
+                        FWAlertWarning("Usuario sem permissao de alterar dados sensiveis do fornecedor!")
                     EndIf
 
                 EndIf
