@@ -503,8 +503,8 @@ Method GravaLog() as Logical Class ZTLAssinaEletronica
         EndIf
 
         If !U_ZTLGravaLog( ::cRotina, ::cTabela, cChaveLog, ::aAlteracoes[nI][1], ;
-                ::ValorParaChar(::aAlteracoes[nI][2]), ;
-                ::ValorParaChar(::aAlteracoes[nI][3]), ;
+                ::DescValor(::aAlteracoes[nI][1], ::aAlteracoes[nI][2]), ;
+                ::DescValor(::aAlteracoes[nI][1], ::aAlteracoes[nI][3]), ;
                 ::cJustificativa )
             lRet := .F.
         EndIf

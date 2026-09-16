@@ -10,9 +10,11 @@
 			"enableTableSync": true,
 			"enableMultiThread": true
 		}
-
-
-
-
-	]
+	],
+	"lastPrograms": [
+		{
+			"label": "SIGAMDI"
+		}
+	],
+	"lastProgramExecuted": "SIGAMDI"
 }

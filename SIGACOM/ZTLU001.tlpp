@@ -39,23 +39,24 @@ User Function ZTLGravaLog(cRotina as Character, cTabela as Character, cChave as 
     Local cValorAntFmt  := fValorToChar(xValorAnt) as Character
     Local cValorNovFmt  := fValorToChar(xValorNov) as Character
 
-    If Select("ZTL") == 0
-        dbUseArea(.T., "TOPCONN", RetSqlName("ZTL"), "ZTL", .T., .F.)
-    EndIf
+    // If Select("ZTL") == 0
+    //     dbUseArea(.T., "TOPCONN", RetSqlName("ZTL"), "ZTL", .T., .F.)
+    // EndIf
 
-    If Select("ZTL") == 0
-        RestArea(aArea)
-        Return .F.
-    EndIf
+    // If Select("ZTL") == 0
+    //     RestArea(aArea)
+    //     Return .F.
+    // EndIf
 
     DbSelectArea("ZTL")
 
     Try
+        DbSetOrder(1)
         cNumSeq := GetSxeNum("ZTL", "ZTL_SEQ")
 
         RecLock("ZTL", .T.)
             ZTL->ZTL_FILIAL := cFilAux
-            ZTL->ZTL_SEQ    := cNumSeq
+            ZTL->ZTL_SEQ    := Right(cNumSeq, 9)
             ZTL->ZTL_ROTINA := cRotina
             ZTL->ZTL_TABELA := cTabela
             ZTL->ZTL_CHAVE  := cChave
