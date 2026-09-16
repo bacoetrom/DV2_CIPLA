@@ -3,17 +3,6 @@
 
 #DEFINE CRLF Chr(13)+Chr(10)
 
-//-------------------------------------------------------------------
-// ZTLU001 - Motor Generico de Auditoria (tabela ZTL)
-//
-// Biblioteca reaproveitavel por qualquer rotina/entry point do
-// sistema que precise registrar a alteracao de um campo sensivel
-// mediante justificativa obrigatoria do usuario. Centraliza a
-// gravacao do log (ZTLGravaLog) e o dialogo de captura da
-// justificativa (ZTLGetJustif), usados hoje por A010TOK (MATA010)
-// e CICOMR01 (SA2).
-//-------------------------------------------------------------------
-
 /*/{Protheus.doc} ZTLGravaLog
 Grava um registro generico de auditoria na tabela ZTL.
 @type user function
