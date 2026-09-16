@@ -4,38 +4,6 @@
 #INCLUDE "TBICONN.CH"
 #DEFINE CRLF Chr(13)+Chr(10)
 
-//-------------------------------------------------------------------
-// ZTLU002 - Classe generica de Assinatura Eletronica
-//
-// Unifica em uma unica classe reaproveitavel o fluxo de "Assinatura
-// Eletronica" (Justificativa + Senha de login + Chave de autorizacao)
-// hoje duplicado em CICOMR01.tlpp (SA2) e MT410TOK.tlpp (SC6), ambos
-// usados como MODELO para esta classe e mantidos SEM NENHUMA
-// ALTERACAO. A gravacao do log continua no mesmo motor generico ja
-// existente (U_ZTLGravaLog / U_ZTLGetJustif, ver ZTLU001.tlpp).
-//
-// Uso tipico (novo ponto de entrada / nova rotina que precise do
-// mesmo fluxo de senha + chave + justificativa por alteracao de
-// campo sensivel, no padrao ja usado por CICOMR01 e MT410TOK):
-//
-//   Local oAssEle as Object
-//
-//   oAssEle := ZTLAssinaEletronica():New("MT410TOK", "SC6", SC5->C5_NUM + cItem)
-//   oAssEle:SetTitulo("Assinatura Eletronica - Alteracao de Armazem")
-//   oAssEle:SetParamChave("FS_MT410TK", "123456")
-//   oAssEle:AddAlteracao("C6_LOCAL", cLocalAnt, cLocalNovo)
-//
-//   If oAssEle:Confirma()
-//       // alteracoes liberadas e log ja gravado em ZTL
-//   EndIf
-//
-// Para varios campos alterados na mesma edicao (padrao CICOMR01, uma
-// unica tela cobrindo N campos), basta chamar AddAlteracao() uma vez
-// por campo antes de Confirma() - a classe monta a mensagem consolidada,
-// pede a confirmacao uma unica vez e grava um registro de auditoria por
-// campo ao final.
-//-------------------------------------------------------------------
-
 /*/{Protheus.doc} ZTLAssinaEletronica
 Classe generica de Assinatura Eletronica (Justificativa + Senha de login
 + Chave de autorizacao) para confirmar a alteracao de campos sensiveis de
@@ -45,14 +13,6 @@ motor generico ZTL (U_ZTLGravaLog, ver ZTLU001.tlpp).
 @version 1.0
 @author Pablo Regis
 @since 16/09/2026
-@obs Criada com base no fluxo ja em producao em CICOMR01.tlpp (SA2) e
-MT410TOK.tlpp (SC6), para eliminar a duplicacao do mesmo dialogo de
-senha/chave/justificativa em cada novo ponto de entrada. CICOMR01.tlpp e
-MT410TOK.tlpp foram usados apenas como modelo/referencia e NAO foram
-alterados por esta classe.
-@see ZTLU001
-@see CICOMR01
-@see MT410TOK
 /*/
 Class ZTLAssinaEletronica
 
@@ -68,7 +28,7 @@ Class ZTLAssinaEletronica
     Public Method New(cRotina as Character, cTabela as Character, cChaveReg as Character) as Object
     Public Method SetTitulo(cTitulo as Character) as Object
     Public Method SetParamChave(cParam as Character, cChaveDefault as Character) as Object
-    Public Method AddAlteracao(cCampo as Character, xValorAnt, xValorNovo) as Object
+    Public Method AddAlteracao(cCampo as Character, xValorAnt, xValorNovo, cItemLabel as Character, cChaveItem as Character) as Object
     Public Method SetAlteracoes(aAlteracoes as Array) as Object
     Public Method Confirma() as Logical
     Public Method GetJustificativa() as Character
@@ -154,19 +114,24 @@ Return Self
 /*/{Protheus.doc} AddAlteracao
 Adiciona uma alteracao de campo sensivel a lista que sera exibida e
 confirmada em Confirma(). Pode ser chamado varias vezes, uma por
-campo alterado, cobrindo o mesmo caso do CICOMR01 (N campos alterados
-na mesma edicao, confirmados numa unica tela).
+campo alterado, cobrindo o caso do CICOMR01 (N campos alterados no
+mesmo registro, confirmados numa unica tela) e tambem o caso de N
+registros fisicos distintos alterados numa unica confirmacao (ex.:
+MT410TOK validando varios itens do pedido de uma so vez), atraves dos
+parametros opcionais cItemLabel/cChaveItem.
 @type method
 @author Pablo Regis
 @since 16/09/2026
 @param cCampo, character, "Nome do campo alterado (ex.: 'A2_MSBLQL')"
 @param xValorAnt, variant, "Valor anterior do campo"
 @param xValorNovo, variant, "Valor novo do campo"
+@param cItemLabel, character, "Identificacao opcional do registro/item (ex.: 'Item 0001'), exibida como prefixo na tela e no log de INFO quando uma mesma confirmacao reune alteracoes de mais de um registro fisico; vazio (default) quando a confirmacao trata um unico registro, mantendo o comportamento classico de CICOMR01/A010TOK"
+@param cChaveItem, character, "Chave especifica deste registro para gravacao no log de auditoria (ZTL_CHAVE), usada no lugar da chave informada no construtor; vazio (default) usa a chave do construtor (::cChaveReg), mantendo o comportamento classico de CICOMR01/A010TOK onde todas as alteracoes pertencem ao mesmo registro"
 @return object, "instancia da classe (permite chamadas encadeadas)"
 /*/
-Method AddAlteracao(cCampo as Character, xValorAnt, xValorNovo) as Object Class ZTLAssinaEletronica
+Method AddAlteracao(cCampo as Character, xValorAnt, xValorNovo, cItemLabel as Character, cChaveItem as Character) as Object Class ZTLAssinaEletronica
 
-    aAdd(::aAlteracoes, {AllTrim(cCampo), xValorAnt, xValorNovo})
+    aAdd(::aAlteracoes, {AllTrim(cCampo), xValorAnt, xValorNovo, AllTrim(cItemLabel), AllTrim(cChaveItem)})
 
 Return Self
 
@@ -303,11 +268,18 @@ INFO, no mesmo formato hoje usado pelo CICOMR01.
 /*/
 Method MontaMsgAlteracoes() as Character Class ZTLAssinaEletronica
 
-    Local cMsg := "" as Character
-    Local nI   := 0  as Numeric
+    Local cMsg   := "" as Character
+    Local cLabel := "" as Character
+    Local nI     := 0  as Numeric
 
     For nI := 1 To Len(::aAlteracoes)
-        cMsg += ::TituloCampo(::aAlteracoes[nI][1]) + " (" + ::aAlteracoes[nI][1] + "): " + ;
+
+        cLabel := ""
+        If Len(::aAlteracoes[nI]) >= 4 .And. !Empty(::aAlteracoes[nI][4])
+            cLabel := AllTrim(::aAlteracoes[nI][4]) + " - "
+        EndIf
+
+        cMsg += cLabel + ::TituloCampo(::aAlteracoes[nI][1]) + " (" + ::aAlteracoes[nI][1] + "): " + ;
             ::DescValor(::aAlteracoes[nI][1], ::aAlteracoes[nI][2]) + " -> " + ;
             ::DescValor(::aAlteracoes[nI][1], ::aAlteracoes[nI][3]) + CRLF
     Next nI
@@ -507,7 +479,11 @@ Return lValido
 /*/{Protheus.doc} GravaLog
 Percorre todas as alteracoes adicionadas e grava um registro de
 auditoria por campo no motor generico ZTL via U_ZTLGravaLog (ver
-ZTLU001.tlpp), usando a Justificativa confirmada em Confirma().
+ZTLU001.tlpp), usando a Justificativa confirmada em Confirma(). Quando
+uma alteracao especifica informou cChaveItem (ver AddAlteracao), usa
+essa chave no lugar de ::cChaveReg, permitindo que uma unica
+confirmacao grave um registro de log por item/registro fisico
+efetivamente alterado (ex.: MT410TOK).
 @type method
 @author Pablo Regis
 @since 16/09/2026
@@ -515,11 +491,18 @@ ZTLU001.tlpp), usando a Justificativa confirmada em Confirma().
 /*/
 Method GravaLog() as Logical Class ZTLAssinaEletronica
 
-    Local nI   := 0  as Numeric
-    Local lRet := .T. as Logical
+    Local nI        := 0  as Numeric
+    Local lRet      := .T. as Logical
+    Local cChaveLog := "" as Character
 
     For nI := 1 To Len(::aAlteracoes)
-        If !U_ZTLGravaLog( ::cRotina, ::cTabela, ::cChaveReg, ::aAlteracoes[nI][1], ;
+
+        cChaveLog := ::cChaveReg
+        If Len(::aAlteracoes[nI]) >= 5 .And. !Empty(::aAlteracoes[nI][5])
+            cChaveLog := ::aAlteracoes[nI][5]
+        EndIf
+
+        If !U_ZTLGravaLog( ::cRotina, ::cTabela, cChaveLog, ::aAlteracoes[nI][1], ;
                 ::ValorParaChar(::aAlteracoes[nI][2]), ;
                 ::ValorParaChar(::aAlteracoes[nI][3]), ;
                 ::cJustificativa )
