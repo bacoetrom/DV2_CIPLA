@@ -78,8 +78,11 @@ Class ZTLAssinaEletronica
     Private Method ValorParaChar(xValor) as Character
     Private Method ValidaSenha(cSenha as Character) as Logical
     Private Method ValidaChave(cChave as Character) as Logical
-    Private Method ValidaCampos(cSenha as Character, cChave as Character, cJustif as Character) as Logical
-    Private Method FechaSeValido(oDlg as Object, lValido as Logical) as Logical
+    // Publicos: acionados pela Static Function de callback do BMPBUTTON de
+    // confirmacao (fConfirmaZTLAssEle), fora do escopo da classe, no mesmo
+    // padrao de fConfirmaCICO() usado como base em CICOMR01.tlpp
+    Public Method ValidaCampos(cSenha as Character, cChave as Character, cJustif as Character) as Logical
+    Public Method FechaSeValido(oDlg as Object, lValido as Logical) as Logical
     Private Method GravaLog() as Logical
 
 EndClass
@@ -199,18 +202,19 @@ proprio CICOMR01 e A010TOK ja fazem.
 /*/
 Method Confirma() as Logical Class ZTLAssinaEletronica
 
-    Local cNomUsr      := AllTrim(UsrRetName(RetCodUsr())) as Character
-    Local cMsgAlt      := ""        as Character
-    Local cSenhaDlg    := Space(40)  as Character
-    Local cChaveDlg    := Space(40)  as Character
-    Local cJustifDlg   := Space(200) as Character
-    Local lConfirmaDlg := .F.       as Logical
-    Local lRet         := .T.       as Logical
-    Local oDlgAss       as Object
-    Local oMemoAlt       as Object
-    Local oGetJust        as Object
-    Local oGetSenha        as Object
-    Local oGetChave         as Object
+    Local cNomUsr    := AllTrim(UsrRetName(RetCodUsr())) as Character
+    Local cMsgAlt    := ""                               as Character
+    Local cTituloDlg := ::cTitulo                        as Character
+    Local cRegistro  := ::cTabela + " - " + ::cChaveReg  as Character
+    Local lRet       := .T.                              as Logical
+
+    Private _oDlgAssEle      := Nil          as Object
+    Private _oSelfAssEle     := Nil          as Object
+    Private _lOpAssEle       := .F.          as Logical
+    Private _cSenhaAssEle    := Space(40)    as Character
+    Private _cChaveAssEle    := Space(40)    as Character
+    Private _cJustifAssEle   := Space(200)   as Character
+    Private _cListaAltAssEle := Space(200)   as Character
 
     If Len(::aAlteracoes) == 0
         Return .T.
@@ -220,6 +224,8 @@ Method Confirma() as Logical Class ZTLAssinaEletronica
     ProcLogAtu("INICIO")
 
     cMsgAlt := ::MontaMsgAlteracoes()
+    _cListaAltAssEle := cMsgAlt
+    _oSelfAssEle     := Self
 
     ProcLogAtu("MENSAGEM", "INFO", "Tentativa de alteracao de campos sensiveis via Assinatura Eletronica" + CRLF + ;
         "Rotina: " + ::cRotina + CRLF + ;
@@ -228,33 +234,37 @@ Method Confirma() as Logical Class ZTLAssinaEletronica
         "Data/Hora: " + DtoC(Date()) + " " + Time() + CRLF + ;
         "Usuario Logado: " + cNomUsr)
 
-    DEFINE MSDIALOG oDlgAss TITLE ::cTitulo FROM 000, 000 TO 360, 450 PIXEL
+    // Dialogo montado com os mesmos comandos classicos (@ .. DIALOG / @ .. GET /
+    // BMPBUTTON / BUTTON / ACTIVATE DIALOG) usados como base em CICOMR01.tlpp.
+    // O GET classico exige memvar (Private/Public/Local) ligada por nome, por
+    // isso os campos de tela usam as Privates acima (nao ::atributo). Pelo
+    // mesmo motivo, a acao do BMPBUTTON de confirmacao delega para a Static
+    // Function fConfirmaZTLAssEle(), no mesmo padrao do fConfirmaCICO() do
+    // CICOMR01, que aciona a instancia guardada em _oSelfAssEle
+    @ 00,0 TO 470,350 DIALOG _oDlgAssEle TITLE cTituloDlg
+        @ 08,02 SAY "Registro: "
+        @ 08,35 SAY cRegistro
+        @ 18,02 SAY "Alteracoes (campo: valor atual -> valor novo):"
+        @ 24,02 GET _cListaAltAssEle MEMO SIZE 150,40 WHEN .F.
+        @ 90,02 SAY "Justificativa da alteracao (obrigatoria):"
+        @ 100,02 GET _cJustifAssEle MEMO SIZE 150,50
+        @ 175,02 SAY "Redigite sua senha de login (" + cNomUsr + ") para confirmar:"
+        @ 185,02 SAY "Senha: "
+        @ 185,45 GET _cSenhaAssEle PICTURE "@S40" VALID .T. PASSWORD Object oSenhaAssEle
+        @ 200,02 SAY "Chave: "
+        @ 200,45 GET _cChaveAssEle PICTURE "@S40" VALID .T. PASSWORD Object oChaveAssEle
+        @ 220,060 BMPBUTTON TYPE 1 ACTION fConfirmaZTLAssEle()
+        @ 220,090 BUTTON "Auditoria" SIZE 35,11 ACTION PROCLOGVIEW()
+    ACTIVATE DIALOG _oDlgAssEle CENTERED
 
-        @ 008, 008 SAY "Alteracoes (campo: valor atual -> valor novo)" SIZE 180, 008 OF oDlgAss PIXEL
-        @ 018, 008 GET oMemoAlt VAR cMsgAlt MEMO SIZE 180, 060 OF oDlgAss PIXEL WHEN .F.
-
-        @ 084, 008 SAY "Justificativa (obrigatoria)" SIZE 180, 008 OF oDlgAss PIXEL
-        @ 094, 008 MSGET oGetJust VAR cJustifDlg MEMO SIZE 180, 040 OF oDlgAss PIXEL
-
-        @ 140, 008 SAY "Senha de login (" + cNomUsr + ")" SIZE 180, 008 OF oDlgAss PIXEL
-        @ 150, 008 MSGET oGetSenha VAR cSenhaDlg SIZE 180, 010 PASSWORD OF oDlgAss PIXEL
-
-        @ 168, 008 SAY "Chave de autorizacao" SIZE 180, 008 OF oDlgAss PIXEL
-        @ 178, 008 MSGET oGetChave VAR cChaveDlg SIZE 180, 010 PASSWORD OF oDlgAss PIXEL
-
-        DEFINE SBUTTON FROM 200, 80  TYPE 1 ENABLE OF oDlgAss ACTION (lConfirmaDlg := ::ValidaCampos(cSenhaDlg, cChaveDlg, cJustifDlg), ::FechaSeValido(oDlgAss, lConfirmaDlg))
-        DEFINE SBUTTON FROM 200, 115 TYPE 2 ENABLE OF oDlgAss ACTION (lConfirmaDlg := .F., oDlgAss:End())
-
-    ACTIVATE MSDIALOG oDlgAss CENTERED
-
-    If !lConfirmaDlg
+    If !_lOpAssEle
         MsgStop("Operacao cancelada, ou Senha/Chave/Justificativa invalidas. As alteracoes nao serao gravadas.", "Cancelamento")
         ProcLogAtu("MENSAGEM", "FALHA", "Operacao cancelada ou dados invalidos informados pelo usuario " + cNomUsr + ". Alteracoes nao efetivadas.")
         ProcLogAtu("FIM")
         Return .F.
     EndIf
 
-    ::cJustificativa := AllTrim(cJustifDlg)
+    ::cJustificativa := AllTrim(_cJustifAssEle)
 
     lRet := ::GravaLog()
 
@@ -481,14 +491,14 @@ dados em caso de falha (mesmo comportamento do CICOMR01/MT410TOK).
 @type method
 @author Pablo Regis
 @since 16/09/2026
-@param oDlg, object, "Dialogo de confirmacao"
+@param oDlg, object, "Dialogo de confirmacao (objeto classico retornado por @ .. DIALOG, igual ao _oTela do CICOMR01)"
 @param lValido, logical, ".T. fecha o dialogo"
 @return logical, "o proprio valor de lValido recebido"
 /*/
 Method FechaSeValido(oDlg as Object, lValido as Logical) as Logical Class ZTLAssinaEletronica
 
     If lValido
-        oDlg:End()
+        Close(oDlg)
     EndIf
 
 Return lValido
@@ -517,3 +527,23 @@ Method GravaLog() as Logical Class ZTLAssinaEletronica
     Next nI
 
 Return lRet
+
+/*/{Protheus.doc} fConfirmaZTLAssEle
+Valida a obrigatoriedade da Justificativa, a Senha de login e a Chave
+de autorizacao antes de permitir o fechamento do dialogo classico de
+Assinatura Eletronica montado em ZTLAssinaEletronica:Confirma().
+Equivalente ao fConfirmaCICO() do CICOMR01.tlpp: existe como Static
+Function (fora da classe) porque o BMPBUTTON classico so aceita uma
+chamada de funcao simples em ACTION, e aciona a instancia da classe
+guardada na Private _oSelfAssEle.
+@type function
+@author Pablo Regis
+@since 16/09/2026
+@return logical, ".T. se os dados informados sao validos e o dialogo foi fechado"
+/*/
+Static Function fConfirmaZTLAssEle() as Logical
+
+    _lOpAssEle := _oSelfAssEle:ValidaCampos(_cSenhaAssEle, _cChaveAssEle, _cJustifAssEle)
+    _oSelfAssEle:FechaSeValido(_oDlgAssEle, _lOpAssEle)
+
+Return _lOpAssEle
