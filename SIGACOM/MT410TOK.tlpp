@@ -13,7 +13,6 @@ Inclusão, Alteração, Exclusão ou Cópia do pedido – sintaxe oficial
 MT410TOK([nOpc], [aRecnoSE1RA]).
 
 Ao confirmar o pedido, percorre todas as linhas de aCols e identifica
-<<<<<<< HEAD
 todos os itens que ja existiam fisicamente gravados em SC6 e tiveram o
 Lote de Controle (C6_LOTECTL) alterado. Uma linha nova (sem registro
 fisico anterior em SC6) nunca exige justificativa. Somente ao final do
@@ -25,19 +24,6 @@ Assinatura Eletronica (tela, validacoes de senha/chave e gravacao do
 registro de auditoria na tabela ZTL via U_ZTLGravaLog()) e delegado a
 classe generica ZTLAssinaEletronica (ver ZTLU002.tlpp), que reaproveita o
 motor generico de auditoria ja usado por A010TOK e CICOMR01 (ver
-=======
-todos os itens que já existiam fisicamente gravados em SC6 e tiveram o
-Armazém (C6_LOCAL) alterado. Uma linha nova (sem registro físico
-anterior em SC6) nunca exige justificativa. Somente ao final do laço,
-com todos os itens alterados já identificados, é exibida uma ÚNICA tela
-de Assinatura Eletrônica (senha do próprio usuário logado + Justificativa),
-listando todos os itens alterados de uma só vez; se confirmada, grava um
-registro de auditoria por item alterado, numa única leva. O fluxo de
-Assinatura Eletrônica (tela, validações de senha/chave e gravação do
-registro de auditoria na tabela ZTL via U_ZTLGravaLog()) é delegado à
-classe genérica ZTLAssinaEletronica (ver ZTLU002.tlpp), que reaproveita o
-motor genérico de auditoria já usado por A010TOK e CICOMR01 (ver
->>>>>>> main
 ZTLU001.tlpp).
 
 Substitui a implementação anterior "WM410LINE", que usava um nome de Ponto
