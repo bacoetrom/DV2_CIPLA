@@ -3,10 +3,10 @@
 #Include "FWMVCDef.ch"
 
 //-------------------------------------------------------------------
-// ZTLA010 - Consulta de Log de Auditoria Generico (tabela ZTL)
+// ZTLA010 - Consulta de Log de Auditoria Genérico (tabela ZTL)
 //
 // Rotina MVC (Model-View-Controller) para VISUALIZAÇÃO dos registros
-// gravados pelo motor generico de auditoria U_ZTLGravaLog (ZTLU001),
+// gravados pelo motor genérico de auditoria U_ZTLGravaLog (ZTLU001),
 // usado hoje pelo Ponto de Entrada A010TOK (MATA010 - Cadastro de
 // Produtos, campo B1_TIPO) e pela função CICOMR01 (SA2, campo
 // A2_MSBLQL), podendo ser reaproveitado por qualquer outra rotina.
@@ -32,11 +32,11 @@ User Function ZTLA010()
 Return
 
 /*/{Protheus.doc} ModelDef
-Define o Model (regras de dados) do log de auditoria generico ZTL.
+Define o Model (regras de dados) do log de auditoria genérico ZTL.
 @type function
 @author Pablo Regis
 @since 27/08/2026
-@return object, "Instancia de MPFormModel do ZTLA010"
+@return object, "Instância de MPFormModel do ZTLA010"
 /*/
 Static Function ModelDef()
 
@@ -78,7 +78,7 @@ Define as opções de menu disponíveis no Browse.
 
 Propositalmente só existe a opção "Visualizar" (OPERATION 2), sem
 Incluir (3), Alterar (4) ou Excluir (5) — já que os registros dessa
-tabela devem ser gravados exclusivamente pelo motor generico de
+tabela devem ser gravados exclusivamente pelo motor genérico de
 auditoria U_ZTLGravaLog (ZTLU001), e não editados manualmente pelo
 usuário.
 /*/
