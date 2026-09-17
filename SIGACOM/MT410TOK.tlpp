@@ -222,7 +222,7 @@ Static Function MT410TKAcumLinha(nLinha as Numeric, nPosLote as Numeric, nPosIte
 		Return .F.
 	EndIf
 
-	aAdd(aPendentes, {cItemLin, cLoteAnt, cLoteNovo, cChaveLin})
+	aAdd(aPendentes, {cItemLin, cLoteAnt, cLoteNovo, cChaveLin,dMenorVenc,dDtValidNovo})
 
 Return .T.
 
@@ -326,6 +326,8 @@ Static Function MT410TKAssinaLote(aPendentes as Array) as Logical
 	For nI := 1 To Len(aPendentes)
 		oAssEle:AddAlteracao("C6_LOTECTL", aPendentes[nI][2], aPendentes[nI][3], ;
 			"Item " + aPendentes[nI][1], xFilial("SC6") + SC5->C5_NUM + aPendentes[nI][1])
+		oAssEle:AddAlteracao("C6_DTVALID", aPendentes[nI][5], aPendentes[nI][6], ;
+			"Item " + aPendentes[nI][1], xFilial("SC6") + SC5->C5_NUM + aPendentes[nI][1])			
 	Next nI
 
 	lRet := oAssEle:Confirma()
@@ -364,7 +366,6 @@ Static Function MT410TKMenorVenc(cProduto as Character, cLocal as Character) as 
 
 	cQuery := "SELECT B8.B8_DTVALID "
 	cQuery +=   "FROM " + RetSqlName("SB8") + " B8 "
-	cQuery +=   "%NoLock% "
 	cQuery +=  "WHERE B8.B8_FILIAL = ? "
 	cQuery +=    "AND B8.B8_PRODUTO = ? "
 	cQuery +=    "AND B8.B8_LOCAL = ? "
@@ -382,7 +383,7 @@ Static Function MT410TKMenorVenc(cProduto as Character, cLocal as Character) as 
 	cAliasQry := oQry:OpenAlias()
 
 	If !(cAliasQry)->(Eof())
-		dMenorVenc := (cAliasQry)->B8_DTVALID
+		dMenorVenc := stod((cAliasQry)->B8_DTVALID)
 	EndIf
 
 	(cAliasQry)->(DbCloseArea())

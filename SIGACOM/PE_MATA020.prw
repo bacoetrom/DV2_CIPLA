@@ -19,7 +19,8 @@ User Function CUSTOMERVENDOR()
     Local lIsGrid      := .F.
     Local oModel       := FwModelActive()
     Local nOpc
-    Local aCampSens    := {"A2_MSBLQL", "A2_XSTATU"}
+    Local cCampSens    := SuperGetMv("CP_AUDFOR",.F.,"A2_MSBLQL|A2_XSTATU")
+    Local aCampSens    := StrTokarr(cCampSens,"|")
     Local cCampoAtu    := ""
     Local xValorAnt    := Nil
     Local xValorNovo   := Nil
@@ -33,7 +34,7 @@ User Function CUSTOMERVENDOR()
         cIdModel := aParam[3]
         lIsGrid  := (Len(aParam) > 3)
 
-        If  Upper(Alltrim(cIdModel))  == "SA2MASTER"
+        If  Upper(Alltrim(cIdModel))  == "SA2MASTER" .And. Len(aCampSens) > 0
 
             If cIdPonto == "MODELPOS"
 
