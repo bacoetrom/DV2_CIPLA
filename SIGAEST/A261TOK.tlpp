@@ -7,35 +7,35 @@ Static cA261TKArmApr := "" as Character
 Static cA261TKGrpQA  := "" as Character
 
 /*/{Protheus.doc} A261TOK
-Ponto de entrada de valida??o "Tudo Ok" da linha da rotina MATA261
-(Transfer?ncia entre Almoxarifados/Dep?sitos).
+Ponto de entrada de validação "Tudo Ok" da linha da rotina MATA261
+(Transferência entre Almoxarifados/Depósitos).
 
-Bloqueia movimenta??es de transfer?ncia (armaz?m de origem e/ou de destino)
-envolvendo os armaz?ns restritos de Controle de Qualidade ? Quarentena
-(par?metro MV_CQ) e Aprovado (par?metro MV_CQAPR) ? para usu?rios que n?o
-pertencem ao grupo "Garantia da Qualidade" (par?metro MV_GRPQA).
+Bloqueia movimentações de transferência (armazém de origem e/ou de destino)
+envolvendo os armazéns restritos de Controle de Qualidade – Quarentena
+(parâmetro MV_CQ) e Aprovado (parâmetro MV_CQAPR) – para usuários que não
+pertencem ao grupo "Garantia da Qualidade" (parâmetro MV_GRPQA).
 
-Para os usu?rios do grupo, exige Assinatura Eletr?nica (senha do pr?prio
-usu?rio logado) e Justificativa antes de liberar a movimenta??o
+Para os usuários do grupo, exige Assinatura Eletrônica (senha do próprio
+usuário logado) e Justificativa antes de liberar a movimentação
 (ex.: Quarentena -> Aprovado).
 
-Acionado pela fun??o padr?o a261TudoOk(), ?ltimo gate de valida??o da linha
+Acionado pela função padrão a261TudoOk(), último gate de validação da linha
 corrente antes dela ser efetivamente incorporada a aCols (callback "TudoOk"
 do MSGetDados criado em Mata261()).
 
 PARAMIXB:
-  N?o recebido ? o ExecBlock("A261TOK",.F.,.F.) padr?o n?o envia array de
-  par?metros. A linha corrente ? obtida pela vari?vel Private "n", herdada
-  da mesma forma que a pr?pria a261TudoOk() faz (Default nLinha := n).
+  Não recebido – o ExecBlock("A261TOK",.F.,.F.) padrão não envia array de
+  parâmetros. A linha corrente é obtida pela variável Private "n", herdada
+  da mesma forma que a própria a261TudoOk() faz (Default nLinha := n).
 
 @type user function
 @author Claude
 @since 24/07/2026
-@return Logical, .T. permite a movimenta??o da linha / .F. bloqueia
-@obs N?o executado dentro de Begin/End Transaction (valida??o ocorre durante
-a digita??o da grid, antes da grava??o). N?o adicionar prefixo U_ na
-declara??o da fun??o. Depende das vari?veis Private aCols/aHeader/n
-declaradas pela rotina padr?o MATA261.
+@return Logical, .T. permite a movimentação da linha / .F. bloqueia
+@obs Não executado dentro de Begin/End Transaction (validação ocorre durante
+a digitação da grid, antes da gravação). Não adicionar prefixo U_ na
+declaração da função. Depende das variáveis Private aCols/aHeader/n
+declaradas pela rotina padrão MATA261.
 @see MATA261
 /*/
 User Function A261TOK() as Logical
@@ -53,18 +53,18 @@ User Function A261TOK() as Logical
 Return lRet
 
 /*/{Protheus.doc} A261TKVldArmRest
-Verifica se a linha de transfer?ncia envolve armaz?m restrito (Quarentena
-ou Aprovado) e aplica a regra de bloqueio/assinatura eletr?nica.
+Verifica se a linha de transferência envolve armazém restrito (Quarentena
+ou Aprovado) e aplica a regra de bloqueio/assinatura eletrônica.
 @type static function
 @author Claude
 @since 24/07/2026
-@param nLinha, numeric, N?mero da linha corrente de aCols
-@return logical, .T. permite a opera??o, .F. bloqueia
+@param nLinha, numeric, Número da linha corrente de aCols
+@return logical, .T. permite a operação, .F. bloqueia
 /*/
 Static Function A261TKVldArmRest(nLinha as Numeric) as Logical
 
-	Local nPosArmOri := 4 as Numeric // Armaz?m Origem  (aCols) - mesma posi??o usada em a261TudoOk/A261LinOk/A261VldCod
-	Local nPosArmDes := 9 as Numeric // Armaz?m Destino (aCols) - mesma posi??o usada em a261TudoOk/A261LinOk/A261VldCod
+	Local nPosArmOri := 4 as Numeric // Armazém Origem  (aCols) - mesma posição usada em a261TudoOk/A261LinOk/A261VldCod
+	Local nPosArmDes := 9 as Numeric // Armazém Destino (aCols) - mesma posição usada em a261TudoOk/A261LinOk/A261VldCod
 	Local cArmOri    := "" as Character
 	Local cArmDes    := "" as Character
 	Local lRet       := .T. as Logical
@@ -86,7 +86,7 @@ Static Function A261TKVldArmRest(nLinha as Numeric) as Logical
 	EndIf
 
 	If !A261TKUsrGQ()
-		MsgAlert("Movimentacao nao permitida: o armazem de origem ou de destino e restrito a Garantia da Qualidade.", "Transferencia - Armazem Restrito")
+		MsgAlert("Movimentação não permitida: o armazém de origem ou de destino é restrito à Garantia da Qualidade.", "Transferência - Armazém Restrito")
 		Return .F.
 	EndIf
 
@@ -95,8 +95,8 @@ Static Function A261TKVldArmRest(nLinha as Numeric) as Logical
 Return lRet
 
 /*/{Protheus.doc} A261TKCarregaParam
-Carrega (uma ?nica vez por sess?o) os par?metros de configura??o da regra:
-armaz?ns restritos e grupo de usu?rios "Garantia da Qualidade".
+Carrega (uma única vez por sessão) os parâmetros de configuração da regra:
+armazéns restritos e grupo de usuários "Garantia da Qualidade".
 @type static function
 @author Claude
 @since 24/07/2026
@@ -114,13 +114,13 @@ Static Function A261TKCarregaParam()
 Return Nil
 
 /*/{Protheus.doc} A261TKArmRestr
-Verifica se o armaz?m informado ? um dos armaz?ns restritos de Controle de
+Verifica se o armazém informado é um dos armazéns restritos de Controle de
 Qualidade: Quarentena (MV_CQ) ou Aprovado (MV_CQAPR).
 @type static function
 @author Claude
 @since 24/07/2026
-@param cArmazem, character, C?digo do armaz?m avaliado
-@return logical, .T. se o armaz?m ? restrito
+@param cArmazem, character, Código do armazém avaliado
+@return logical, .T. se o armazém é restrito
 /*/
 Static Function A261TKArmRestr(cArmazem as Character) as Logical
 
@@ -132,14 +132,14 @@ Return (!Empty(cA261TKArmCQ) .And. cArmazem == cA261TKArmCQ) .Or. ;
        (!Empty(cA261TKArmApr) .And. cArmazem == cA261TKArmApr)
 
 /*/{Protheus.doc} A261TKUsrGQ
-Verifica se o usu?rio logado pertence ao grupo "Garantia da Qualidade",
-definido pelo c?digo de grupo do Configurador informado no par?metro
-MV_GRPQA. Se o par?metro n?o estiver configurado, nenhum usu?rio ?
-considerado pertencente ao grupo (comportamento seguro por padr?o).
+Verifica se o usuário logado pertence ao grupo "Garantia da Qualidade",
+definido pelo código de grupo do Configurador informado no parâmetro
+MV_GRPQA. Se o parâmetro não estiver configurado, nenhum usuário é
+considerado pertencente ao grupo (comportamento seguro por padrão).
 @type static function
 @author Claude
 @since 24/07/2026
-@return logical, .T. se o usu?rio pertence ao grupo
+@return logical, .T. se o usuário pertence ao grupo
 /*/
 Static Function A261TKUsrGQ() as Logical
 
@@ -161,24 +161,24 @@ Static Function A261TKUsrGQ() as Logical
 Return (AScan(aGrupos, {|cGrp| AllTrim(cGrp) == cA261TKGrpQA}) > 0)
 
 /*/{Protheus.doc} A261TKAssinaEle
-Exibe dialogo unico de Assinatura Eletronica com os campos Justificativa e
-Senha lado a lado (mesmo layout do fonte de referencia CICOMR01.tlpp),
-exigindo a senha do proprio usuario logado antes de liberar a movimentacao
-de transferencia envolvendo armazem restrito. Grava o log de auditoria na
-tabela ZTL via U_ZTLGravaLog() (mesmo motor generico usado por CICOMR01,
+Exibe diálogo único de Assinatura Eletrônica com os campos Justificativa e
+Senha lado a lado (mesmo layout do fonte de referência CICOMR01.tlpp),
+exigindo a senha do próprio usuário logado antes de liberar a movimentação
+de transferência envolvendo armazém restrito. Grava o log de auditoria na
+tabela ZTL via U_ZTLGravaLog() (mesmo motor genérico usado por CICOMR01,
 ver ZTLU001.tlpp) quando confirmado.
-@obs Nao ha, neste ponto de entrada, um alias de cabecalho (equivalente a
-SC5 no MATA410) disponivel para compor uma chave de documento, nem a
-confirmacao de qual tabela fisica (SD3? outra?) a rotina padrao MATA261
-efetivamente grava. A chave usa o par origem->destino da propria linha
-(cArmOri/cArmDes), e "MATA261" e usado como identificador de origem (em
-vez de um alias de tabela fisica nao validado) no parametro cTabela de
+@obs Não há, neste ponto de entrada, um alias de cabeçalho (equivalente a
+SC5 no MATA410) disponível para compor uma chave de documento, nem a
+confirmação de qual tabela física (SD3? outra?) a rotina padrão MATA261
+efetivamente grava. A chave usa o par origem->destino da própria linha
+(cArmOri/cArmDes), e "MATA261" é usado como identificador de origem (em
+vez de um alias de tabela física não validado) no parâmetro cTabela de
 U_ZTLGravaLog. Ajustar caso a tabela/chave reais sejam confirmadas.
 @type static function
 @author Claude
 @since 24/07/2026
-@param cArmOri, character, Armaz?m de origem da linha
-@param cArmDes, character, Armaz?m de destino da linha
+@param cArmOri, character, Armazém de origem da linha
+@param cArmDes, character, Armazém de destino da linha
 @return logical, .T. se a assinatura e a justificativa foram confirmadas
 /*/
 Static Function A261TKAssinaEle(cArmOri as Character, cArmDes as Character) as Logical
@@ -191,9 +191,9 @@ Static Function A261TKAssinaEle(cArmOri as Character, cArmDes as Character) as L
 	Local cUsuario   := AllTrim(RetCodUsr()) + " - " + AllTrim(UsrRetName(RetCodUsr())) as Character
 	Local lConfirma  := .F. as Logical
 
-	DEFINE MSDIALOG oDlg TITLE "Assinatura Eletronica - Armazem Restrito" FROM 000,000 TO 220,450 PIXEL
+	DEFINE MSDIALOG oDlg TITLE "Assinatura Eletrônica - Armazém Restrito" FROM 000,000 TO 220,450 PIXEL
 
-		@ 008,008 SAY "Usuario logado" SIZE 180,008 OF oDlg PIXEL
+		@ 008,008 SAY "Usuário logado" SIZE 180,008 OF oDlg PIXEL
 		@ 018,008 SAY cUsuario SIZE 180,008 OF oDlg PIXEL
 
 		@ 034,008 SAY "Justificativa" SIZE 180,008 OF oDlg PIXEL
@@ -214,13 +214,13 @@ Static Function A261TKAssinaEle(cArmOri as Character, cArmDes as Character) as L
 Return lConfirma
 
 /*/{Protheus.doc} A261TKFechaDlg
-Fecha o di?logo de Assinatura Eletr?nica quando a confirma??o (senha e
-justificativa) ? v?lida.
+Fecha o diálogo de Assinatura Eletrônica quando a confirmação (senha e
+justificativa) é válida.
 @type static function
 @author Claude
 @since 24/07/2026
-@param oDlg, object, Di?logo de Assinatura Eletr?nica
-@param lFechar, logical, .T. fecha o di?logo
+@param oDlg, object, Diálogo de Assinatura Eletrônica
+@param lFechar, logical, .T. fecha o diálogo
 @return Nil
 /*/
 Static Function A261TKFechaDlg(oDlg as Object, lFechar as Logical)
@@ -232,62 +232,62 @@ Static Function A261TKFechaDlg(oDlg as Object, lFechar as Logical)
 Return Nil
 
 /*/{Protheus.doc} A261TKVldAssEl
-Valida a obrigatoriedade da senha e da justificativa digitadas no dialogo
-de Assinatura Eletronica (layout igual ao CICOMR01.tlpp).
+Valida a obrigatoriedade da senha e da justificativa digitadas no diálogo
+de Assinatura Eletrônica (layout igual ao CICOMR01.tlpp).
 @type static function
 @author Claude
 @since 24/07/2026
-@param cSenha, character, Senha digitada pelo usu?rio
-@param cJustif, character, Justificativa digitada pelo usu?rio
-@return logical, .T. se senha e justificativa sao validas
+@param cSenha, character, Senha digitada pelo usuário
+@param cJustif, character, Justificativa digitada pelo usuário
+@return logical, .T. se senha e justificativa são válidas
 /*/
 Static Function A261TKVldAssEl(cSenha as Character, cJustif as Character) as Logical
 
 	Local lRet := .T. as Logical
 
 	If Empty(AllTrim(cJustif))
-		MsgAlert("Informe a justificativa da movimentacao.", "Assinatura Eletronica - Armazem Restrito")
+		MsgAlert("Informe a justificativa da movimentação.", "Assinatura Eletrônica - Armazém Restrito")
 		Return .F.
 	EndIf
 
 	If Empty(AllTrim(cSenha))
-		MsgAlert("Informe a senha para confirmar.", "Assinatura Eletronica - Armazem Restrito")
+		MsgAlert("Informe a senha para confirmar.", "Assinatura Eletrônica - Armazém Restrito")
 		Return .F.
 	EndIf
 
 	If !A261TKVldSenha(cSenha)
-		MsgAlert("Senha invalida.", "Assinatura Eletronica - Armazem Restrito")
+		MsgAlert("Senha inválida.", "Assinatura Eletrônica - Armazém Restrito")
 		lRet := .F.
 	EndIf
 
 Return lRet
 
 /*/{Protheus.doc} A261TKVldSenha
-Valida a senha digitada do proprio usuario logado (RetCodUsr()), sem abrir
-nenhuma tela adicional, atraves de um login silencioso via RpcSetEnv() na
+Valida a senha digitada do próprio usuário logado (RetCodUsr()), sem abrir
+nenhuma tela adicional, através de um login silencioso via RpcSetEnv() na
 mesma empresa/filial correntes (cEmpAnt/cFilAnt), seguido de RpcClearEnv()
 imediato.
 
-Nao usa mais PswOrder/PswSeek/PswName: a partir do Protheus 11 a funcao
-PswSeek() deixou de validar senha (falha de seguranca corrigida pela
-TOTVS), entao aquele trio de funcoes nao bloqueia mais senha incorreta.
-Tambem nao usa FWAuthUser() porque essa funcao sempre abre sua propria
-tela de usuario/senha e nao aceita uma senha ja digitada em outro campo -
-inviavel para o layout de campo unico usado aqui (igual ao CICOMR01.tlpp).
+Não usa mais PswOrder/PswSeek/PswName: a partir do Protheus 11 a função
+PswSeek() deixou de validar senha (falha de segurança corrigida pela
+TOTVS), então aquele trio de funções não bloqueia mais senha incorreta.
+Também não usa FWAuthUser() porque essa função sempre abre sua própria
+tela de usuário/senha e não aceita uma senha já digitada em outro campo -
+inviável para o layout de campo único usado aqui (igual ao CICOMR01.tlpp).
 
-@obs ATENCAO: RpcSetEnv() foi projetado para abertura de ambiente em
-rotinas automaticas (jobs/schedulers), nao para ser chamado no meio de uma
-sessao interativa ja em edicao (MATA261 com aCols/aHeader abertos). Os
-parametros lAbend/lOpenSX/lConnect sao passados como .F. para minimizar
-efeitos colaterais (nao reabre dicionario, nao forca nova conexao), mas o
-risco de impacto no ambiente/aliases correntes da sessao NAO esta 100%
-eliminado. Recomenda-se testar exaustivamente em homologacao antes de
-subir para producao.
+@obs ATENÇÃO: RpcSetEnv() foi projetado para abertura de ambiente em
+rotinas automáticas (jobs/schedulers), não para ser chamado no meio de uma
+sessão interativa já em edição (MATA261 com aCols/aHeader abertos). Os
+parâmetros lAbend/lOpenSX/lConnect são passados como .F. para minimizar
+efeitos colaterais (não reabre dicionário, não força nova conexão), mas o
+risco de impacto no ambiente/aliases correntes da sessão NÃO está 100%
+eliminado. Recomenda-se testar exaustivamente em homologação antes de
+subir para produção.
 @type static function
 @author Claude
 @since 24/07/2026
-@param cSenha, character, Senha digitada pelo usuario a validar
-@return logical, .T. se a senha do usuario logado esta correta
+@param cSenha, character, Senha digitada pelo usuário a validar
+@return logical, .T. se a senha do usuário logado está correta
 /*/
 Static Function A261TKVldSenha(cSenha as Character) as Logical
 

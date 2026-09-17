@@ -4,29 +4,29 @@
 #DEFINE CRLF Chr(13)+Chr(10)
 
 //-------------------------------------------------------------------
-// ZTLU001 - Motor Generico de Auditoria (tabela ZTL)
+// ZTLU001 - Motor Genérico de Auditoria (tabela ZTL)
 //
-// Biblioteca reaproveitavel por qualquer rotina/entry point do
-// sistema que precise registrar a alteracao de um campo sensivel
-// mediante justificativa obrigatoria do usuario. Centraliza a
-// gravacao do log (ZTLGravaLog) e o dialogo de captura da
+// Biblioteca reaproveitável por qualquer rotina/entry point do
+// sistema que precise registrar a alteração de um campo sensível
+// mediante justificativa obrigatória do usuário. Centraliza a
+// gravação do log (ZTLGravaLog) e o diálogo de captura da
 // justificativa (ZTLGetJustif), usados hoje por A010TOK (MATA010)
 // e CICOMR01 (SA2).
 //-------------------------------------------------------------------
 
 /*/{Protheus.doc} ZTLGravaLog
-Grava um registro generico de auditoria na tabela ZTL.
+Grava um registro genérico de auditoria na tabela ZTL.
 @type user function
 @version 1.0
 @author Pablo Regis
 @since 27/08/2026
-@param cRotina, character, "Rotina/funcao de origem (ex.: CICOMR01, A010TOK)"
+@param cRotina, character, "Rotina/função de origem (ex.: CICOMR01, A010TOK)"
 @param cTabela, character, "Alias da tabela afetada (ex.: SA2, SB1)"
 @param cChave, character, "Chave do registro afetado"
 @param cCampo, character, "Nome do campo alterado"
 @param xValorAnt, variant, "Valor anterior (character, numeric, date ou logical - convertido automaticamente para texto antes de gravar)"
 @param xValorNov, variant, "Valor novo (character, numeric, date ou logical - convertido automaticamente para texto antes de gravar)"
-@param cJustif, character, "Justificativa informada pelo usuario"
+@param cJustif, character, "Justificativa informada pelo usuário"
 @return logical, "retorna .T. se o registro foi gravado com sucesso"
 @table ZTL
 /*/
@@ -84,12 +84,12 @@ Return lRet
 
 /*/{Protheus.doc} fValorToChar
 Converte um valor de qualquer tipo suportado (character, numeric, date, logical)
-para sua representacao em texto, para gravacao nos campos ZTL_VALANT/ZTL_VALNOV.
+para sua representação em texto, para gravação nos campos ZTL_VALANT/ZTL_VALNOV.
 @type function
 @author Pablo Regis
 @since 10/09/2026
 @param xValor, variant, "Valor a ser convertido (character, numeric, date, logical ou nil)"
-@return character, "Representacao textual do valor: o proprio texto (character/memo), numero formatado (numeric), data no formato dd/mm/aaaa (date), 'Sim'/'Nao' (logical), vazio (nil) ou cValToChar() como fallback para outros tipos"
+@return character, "Representação textual do valor: o próprio texto (character/memo), número formatado (numeric), data no formato dd/mm/aaaa (date), 'Sim'/'Não' (logical), vazio (nil) ou cValToChar() como fallback para outros tipos"
 /*/
 Static Function fValorToChar(xValor as Variant) as Character
 
@@ -107,7 +107,7 @@ Static Function fValorToChar(xValor as Variant) as Character
         If xValor
             cRet := "Sim"
         Else
-            cRet := "Nao"
+            cRet := "Não"
         EndIf
     Else
         cRet := cValToChar(xValor)

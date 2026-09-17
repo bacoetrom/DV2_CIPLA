@@ -54,7 +54,7 @@ User Function CUSTOMERVENDOR()
 
                     xRet := oAssEle:Confirma()
                     If xRet == .F.
-                        FWAlertWarning("Usuario sem permissao de alterar dados sensiveis do fornecedor!")
+                        FWAlertWarning("Usuário sem permissão de alterar dados sensíveis do fornecedor!")
                     EndIf
 
                 EndIf
