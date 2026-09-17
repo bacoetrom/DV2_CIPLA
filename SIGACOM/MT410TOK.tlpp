@@ -9,13 +9,20 @@ Static aMT410TKVal := {} as Array
 /*/{Protheus.doc} MT410TOK
 Ponto de entrada real e documentado da rotina MATA410 (Pedido de Venda),
 disparado pela rotina padrão ao confirmar a operação (botão Salvar) de
-Inclusão, Alteração, Exclusão ou Cópia do pedido – sintaxe oficial
+Inclusão, Alteração, Exclusão ou Cópia do pedido à sintaxe oficial
 MT410TOK([nOpc], [aRecnoSE1RA]).
 
 Ao confirmar o pedido, percorre todas as linhas de aCols e identifica
 todos os itens que ja existiam fisicamente gravados em SC6 e tiveram o
 Lote de Controle (C6_LOTECTL) alterado. Uma linha nova (sem registro
-fisico anterior em SC6) nunca exige justificativa. Somente ao final do
+fisico anterior em SC6) nunca exige justificativa. Dentre os itens com
+Lote alterado, aplica a regra FEFO (First Expire, First Out): consulta o
+saldo em lote (SB8) do produto/armazem (C6_PRODUTO/C6_LOCAL) e so
+considera o item pendente de Assinatura Eletronica quando o novo Lote de
+Controle (C6_DTVALID) tiver vencimento posterior ao menor vencimento
+disponivel em SB8 para aquele produto/armazem; a troca para o lote de
+menor vencimento (ou de vencimento igual/anterior) e liberada sem
+solicitar senha (ver MT410TKMenorVenc). Somente ao final do
 laco, com todos os itens alterados ja identificados, e exibida uma UNICA
 tela de Assinatura Eletronica (senha do proprio usuario logado + Justificativa),
 listando todos os itens alterados de uma so vez; se confirmada, grava um
@@ -78,7 +85,9 @@ Return lRet
 /*/{Protheus.doc} MT410TKVldGrid
 Percorre todas as linhas não deletadas de aCols e acumula, em
 aPendentes, todos os itens que tenham sido efetivamente alterados em
-relacao ao valor fisico gravado em SC6 (Lote de Controle). Ao final do
+relacao ao valor fisico gravado em SC6 (Lote de Controle) E que violem a
+regra FEFO (novo vencimento posterior ao menor vencimento disponivel em
+SB8 para o produto - ver MT410TKAcumLinha/MT410TKMenorVenc). Ao final do
 laco, se houver ao menos um item pendente, aciona uma UNICA validacao de
 Assinatura Eletronica (senha + justificativa) cobrindo todos eles de
 uma so vez.
@@ -91,18 +100,24 @@ dados informados foram inválidos (bloqueia a gravação do pedido inteiro)
 /*/
 Static Function MT410TKVldGrid() as Logical
 
-	Local nPosLote   := 0  as Numeric
-	Local nPosItem   := 0  as Numeric
-	Local nI         := 0  as Numeric
-	Local aPendentes := {} as Array
-	Local lRet       := .T. as Logical
+	Local nPosLote    := 0  as Numeric
+	Local nPosItem    := 0  as Numeric
+	Local nPosProduto := 0  as Numeric
+	Local nPosDtValid := 0  as Numeric
+	Local nPosLocal   := 0  as Numeric
+	Local nI          := 0  as Numeric
+	Local aPendentes  := {} as Array
+	Local lRet        := .T. as Logical
 
 	If ValType(aCols) <> "A" .Or. ValType(aHeader) <> "A"
 		Return .T.
 	EndIf
 
-	nPosLote := aScan(aHeader, {|aCampo| AllTrim(aCampo[2]) == "C6_LOTECTL"})
-	nPosItem := aScan(aHeader, {|aCampo| AllTrim(aCampo[2]) == "C6_ITEM"})
+	nPosLote    := aScan(aHeader, {|aCampo| AllTrim(aCampo[2]) == "C6_LOTECTL"})
+	nPosItem    := aScan(aHeader, {|aCampo| AllTrim(aCampo[2]) == "C6_ITEM"})
+	nPosProduto := aScan(aHeader, {|aCampo| AllTrim(aCampo[2]) == "C6_PRODUTO"})
+	nPosDtValid := aScan(aHeader, {|aCampo| AllTrim(aCampo[2]) == "C6_DTVALID"})
+	nPosLocal   := aScan(aHeader, {|aCampo| AllTrim(aCampo[2]) == "C6_LOCAL"})
 
 	If nPosLote == 0 .Or. nPosItem == 0
 		Return .T.
@@ -116,7 +131,7 @@ Static Function MT410TKVldGrid() as Logical
 			Loop
 		EndIf
 
-		MT410TKAcumLinha(nI, nPosLote, nPosItem, aPendentes)
+		MT410TKAcumLinha(nI, nPosLote, nPosItem, nPosProduto, nPosDtValid, nPosLocal, aPendentes)
 
 	Next nI
 
@@ -128,26 +143,37 @@ Return lRet
 
 /*/{Protheus.doc} MT410TKAcumLinha
 Avalia uma linha especifica da grid e, quando o Lote de Controle foi
-efetivamente alterado em relacao ao valor gravado em SC6 e ainda nao
-foi autorizado nesta sessao de edicao (aMT410TKVal), acumula a
-alteracao em aPendentes para validacao unica de Assinatura Eletronica
-ao final do laco (ver MT410TKVldGrid/MT410TKAssinaLote). Nao exibe
-nenhuma tela.
+efetivamente alterado em relacao ao valor gravado em SC6, ainda nao foi
+autorizado nesta sessao de edicao (aMT410TKVal) E a alteracao viola a
+regra FEFO (novo vencimento - C6_DTVALID - posterior ao menor
+vencimento disponivel em SB8 para o produto do item, ver
+MT410TKMenorVenc), acumula a alteracao em aPendentes para validacao
+unica de Assinatura Eletronica ao final do laco (ver
+MT410TKVldGrid/MT410TKAssinaLote). Quando o novo lote e o de menor
+vencimento disponivel (ou de vencimento igual/anterior), a troca e
+liberada sem exigir senha. Nao exibe nenhuma tela.
 @type static function
 @author Pablo Regis
 @since 15/09/2026
 @param nLinha, numeric, Numero da linha corrente de aCols
 @param nPosLote, numeric, Posicao de C6_LOTECTL em aHeader/aCols
 @param nPosItem, numeric, Posicao de C6_ITEM em aHeader/aCols
+@param nPosProduto, numeric, "Posicao de C6_PRODUTO em aHeader/aCols (0 se nao encontrado)"
+@param nPosDtValid, numeric, "Posicao de C6_DTVALID em aHeader/aCols (0 se nao encontrado)"
+@param nPosLocal, numeric, "Posicao de C6_LOCAL em aHeader/aCols (0 se nao encontrado)"
 @param aPendentes, array, "Acumulador (passado por referencia); cada item adicionado no formato {cItem, cLoteAnt, cLoteNovo, cChaveLin}"
-@return logical, .T. se a linha foi acumulada em aPendentes, .F. caso contrario (linha nova, sem alteracao efetiva, ou ja autorizada nesta sessao)
+@return logical, .T. se a linha foi acumulada em aPendentes, .F. caso contrario (linha nova, sem alteracao efetiva, alteracao respeitando o FEFO, ou ja autorizada nesta sessao)
 /*/
-Static Function MT410TKAcumLinha(nLinha as Numeric, nPosLote as Numeric, nPosItem as Numeric, aPendentes as Array) as Logical
+Static Function MT410TKAcumLinha(nLinha as Numeric, nPosLote as Numeric, nPosItem as Numeric, nPosProduto as Numeric, nPosDtValid as Numeric, nPosLocal as Numeric, aPendentes as Array) as Logical
 
-	Local cItemLin  := "" as Character
-	Local cLoteAnt  := "" as Character
-	Local cLoteNovo := "" as Character
-	Local cChaveLin := "" as Character
+	Local cItemLin     := ""       as Character
+	Local cLoteAnt     := ""       as Character
+	Local cLoteNovo    := ""       as Character
+	Local cChaveLin    := ""       as Character
+	Local cProduto     := ""       as Character
+	Local cLocal       := ""       as Character
+	Local dDtValidNovo := CTOD("") as Date
+	Local dMenorVenc   := CTOD("") as Date
 
 	cItemLin  := AllTrim(aCols[nLinha][nPosItem])
 	cLoteNovo := AllTrim(aCols[nLinha][nPosLote])
@@ -162,6 +188,30 @@ Static Function MT410TKAcumLinha(nLinha as Numeric, nPosLote as Numeric, nPosIte
 	// nao exige assinatura eletronica.
 	If Empty(cLoteAnt) .Or. cLoteNovo == cLoteAnt
 		Return .F.
+	EndIf
+
+	// Regra FEFO: se for possivel apurar o produto/vencimento/armazem do
+	// novo lote e existir saldo em SB8 para comparação, e o novo
+	// vencimento nao for posterior ao menor vencimento disponível no
+	// mesmo armazem, libera a troca sem senha. Quando nao for possivel
+	// apurar (campo ausente na grid ou sem saldo em SB8 para o produto),
+	// mantém o comportamento conservador anterior (exige assinatura
+	// eletronica).
+	If nPosProduto > 0 .And. nPosDtValid > 0
+		cProduto := AllTrim(aCols[nLinha][nPosProduto])
+		If ValType(aCols[nLinha][nPosDtValid]) == "D"
+			dDtValidNovo := aCols[nLinha][nPosDtValid]
+		EndIf
+		If nPosLocal > 0
+			cLocal := AllTrim(aCols[nLinha][nPosLocal])
+		EndIf
+	EndIf
+
+	If !Empty(cProduto) .And. !Empty(dDtValidNovo) .And. !Empty(cLocal)
+		dMenorVenc := MT410TKMenorVenc(cProduto, cLocal)
+		If !Empty(dMenorVenc) .And. dDtValidNovo <= dMenorVenc
+			Return .F.
+		EndIf
 	EndIf
 
 	cChaveLin := MT410TKChaveLin(cItemLin, cLoteNovo)
@@ -210,7 +260,7 @@ Static Function MT410TKLoteGrv(cItem as Character) as Character
 
 	SC6->(RestArea(cAliasAnt))
 
-	// RestArea() restaura apenas Recno/Filtro, não a ordem de indice ativa.
+	// RestArea() restaura apenas Recno/Filtro, não a ordem de índice ativa.
 	// Sem isto, o SC6 permanece na ordem 1 após esta validação, o que pode
 	// interferir na forma como a rotina padrão MATA410 localiza/grava os
 	// demais itens do grid após este Ponto de Entrada retornar.
@@ -287,3 +337,54 @@ Static Function MT410TKAssinaLote(aPendentes as Array) as Logical
 	EndIf
 
 Return lRet
+
+/*/{Protheus.doc} MT410TKMenorVenc
+Consulta o saldo em lote (SB8) do produto/armazem informados e retorna
+a menor Data de Validade (B8_DTVALID) entre os lotes ja validos na data
+base (B8_DATA <= dDataBase) e nao deletados (D_E_L_E_T_ = ' '), usada
+como referencia para a regra FEFO (First Expire, First Out) na troca de
+Lote de Controle (C6_LOTECTL) do pedido de venda.
+@type static function
+@author Pablo Regis
+@since 17/09/2026
+@param cProduto, character, Codigo do produto (C6_PRODUTO) sendo validado
+@param cLocal, character, Armazem (C6_LOCAL) do item sendo validado
+@return date, "menor B8_DTVALID disponivel para o produto/armazem na filial corrente, ou data vazia (CTOD('')) se nao houver nenhum lote disponivel"
+/*/
+Static Function MT410TKMenorVenc(cProduto as Character, cLocal as Character) as Date
+
+	Local cQuery     := ""  as Character
+	Local cAliasQry  := ""  as Character
+	Local oQry       := Nil as Object
+	Local dMenorVenc := CTOD("") as Date
+
+	If Empty(cProduto) .Or. Empty(cLocal)
+		Return dMenorVenc
+	EndIf
+
+	cQuery := "SELECT B8.B8_DTVALID "
+	cQuery +=   "FROM " + RetSqlName("SB8") + " B8 "
+	cQuery +=   "%NoLock% "
+	cQuery +=  "WHERE B8.B8_FILIAL = ? "
+	cQuery +=    "AND B8.B8_PRODUTO = ? "
+	cQuery +=    "AND B8.B8_LOCAL = ? "
+	cQuery +=    "AND B8.B8_DATA <= ? "
+	cQuery +=    "AND B8.D_E_L_E_T_ = ? "
+	cQuery += "ORDER BY B8.B8_DTVALID ASC"
+
+	oQry := FWExecStatement():New(ChangeQuery(cQuery))
+	oQry:SetString(1, xFilial("SB8"))
+	oQry:SetString(2, cProduto)
+	oQry:SetString(3, cLocal)
+	oQry:SetString(4, DTOS(dDataBase))
+	oQry:SetString(5, " ")
+
+	cAliasQry := oQry:OpenAlias()
+
+	If !(cAliasQry)->(Eof())
+		dMenorVenc := (cAliasQry)->B8_DTVALID
+	EndIf
+
+	(cAliasQry)->(DbCloseArea())
+
+Return dMenorVenc
