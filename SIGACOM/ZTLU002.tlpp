@@ -335,6 +335,7 @@ Method DescValor(cCampo as Character, xValor) as Character Class ZTLAssinaEletro
         EndIf
     Else
         cDesc := ::ValorParaChar(xValor)
+        
     EndIf
 
 Return cDesc
