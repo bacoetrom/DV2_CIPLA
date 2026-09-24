@@ -208,14 +208,14 @@ Method Confirma() as Logical Class ZTLAssinaEletronica
     // Function fConfirmaZTLAssEle(), no mesmo padrão do fConfirmaCICO() do
     // CICOMR01, que aciona a instância guardada em _oSelfAssEle
     @ 00,0 TO 470,350 DIALOG _oDlgAssEle TITLE cTituloDlg
-        @ 08,02 SAY "Registro: "
+        @ 08,008 SAY "Registro: "
         @ 08,35 SAY cRegistro
-        @ 18,02 SAY "Alterações (campo: valor atual -> valor novo):"
-        @ 24,02 GET _cListaAltAssEle MEMO SIZE 150,40 WHEN .F.
-        @ 90,02 SAY "Justificativa da alteração (obrigatória):"
-        @ 100,02 GET _cJustifAssEle MEMO SIZE 150,50
-        @ 175,02 SAY "Redigite sua senha de login (" + cNomUsr + ") para confirmar:"
-        @ 185,02 SAY "Senha: "
+        @ 18,008 SAY "Alterações (campo: valor atual -> valor novo):"
+        @ 24,008 GET _cListaAltAssEle MEMO SIZE 150,40 WHEN .F.
+        @ 90,008 SAY "Justificativa da alteração (obrigatória):"
+        @ 100,008 GET _cJustifAssEle MEMO SIZE 150,50
+        @ 175,008 SAY "Redigite sua senha de login (" + cNomUsr + ") para confirmar:"
+        @ 185,008 SAY "Senha: "
         @ 185,45 GET _cSenhaAssEle PICTURE "@S40" VALID .T. PASSWORD Object oSenhaAssEle
         // @ 200,02 SAY "Chave: "
         // @ 200,45 GET _cChaveAssEle PICTURE "@S40" VALID .T. PASSWORD Object oChaveAssEle

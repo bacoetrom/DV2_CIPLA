@@ -182,12 +182,12 @@ Method Confirma() as Logical Class ZZ3AssinaEletronica
     // mesmo motivo, a acao do BMPBUTTON de confirmação delega para a Static
     // Function fConfirmaZZ3AssEle(), que aciona a instancia guardada em
     // _oSelfZZ3Ass
-    @ 000,000 TO 160,350 DIALOG _oDlgZZ3Ass TITLE cTituloDlg
+    @ 000,000 TO 350,350 DIALOG _oDlgZZ3Ass TITLE cTituloDlg
         @ 008,008 SAY "Documento: " + ::cDocNum
         @ 008,120 SAY "Usuario: " + cNomUsr
         @ 022,008 SAY "Justificativa da Assinatura Transferência (obrigatoria):"
         @ 032,008 GET _cJustifZZ3Ass MEMO SIZE 150,040
-        @ 084,008 SAY "Redigite sua senha de login para confirmar:"
+        @ 084,008 SAY "Redigite sua senha de login ("+cNomUsr+") para confirmar:"
         @ 094,008 SAY "Senha: "
         @ 094,045 GET _cSenhaZZ3Ass PICTURE "@S40" VALID .T. PASSWORD OBJECT oSenhaZZ3Ass
         @ 125,060 BMPBUTTON TYPE 1 ACTION fConfirmaZZ3AssEle()

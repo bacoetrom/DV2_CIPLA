@@ -48,6 +48,6 @@ User Function ZZ3GravaLog(cRotina, cDocNum, cProduto, nQuant, cArmOri, cArmDes, 
         lRet := .F.
     EndTry
 
-    RestoreArea(aArea)
+    RestArea(aArea)
 
 Return lRet
