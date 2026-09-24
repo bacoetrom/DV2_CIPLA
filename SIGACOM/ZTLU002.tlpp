@@ -178,7 +178,7 @@ Method Confirma() as Logical Class ZTLAssinaEletronica
     Private _oSelfAssEle     := Nil          as Object
     Private _lOpAssEle       := .F.          as Logical
     Private _cSenhaAssEle    := Space(40)    as Character
-    Private _cChaveAssEle    := Space(40)    as Character
+    Private _cChaveAssEle    := "123456"    as Character
     Private _cJustifAssEle   := Space(200)   as Character
     Private _cListaAltAssEle := Space(200)   as Character
 
@@ -217,8 +217,8 @@ Method Confirma() as Logical Class ZTLAssinaEletronica
         @ 175,02 SAY "Redigite sua senha de login (" + cNomUsr + ") para confirmar:"
         @ 185,02 SAY "Senha: "
         @ 185,45 GET _cSenhaAssEle PICTURE "@S40" VALID .T. PASSWORD Object oSenhaAssEle
-        @ 200,02 SAY "Chave: "
-        @ 200,45 GET _cChaveAssEle PICTURE "@S40" VALID .T. PASSWORD Object oChaveAssEle
+        // @ 200,02 SAY "Chave: "
+        // @ 200,45 GET _cChaveAssEle PICTURE "@S40" VALID .T. PASSWORD Object oChaveAssEle
         @ 220,060 BMPBUTTON TYPE 1 ACTION fConfirmaZTLAssEle()
         @ 220,090 BUTTON "Auditoria" SIZE 35,11 ACTION PROCLOGVIEW()
     ACTIVATE DIALOG _oDlgAssEle CENTERED
@@ -502,13 +502,14 @@ Method GravaLog() as Logical Class ZTLAssinaEletronica
         If Len(::aAlteracoes[nI]) >= 5 .And. !Empty(::aAlteracoes[nI][5])
             cChaveLog := ::aAlteracoes[nI][5]
         EndIf
-
+        
         If !U_ZTLGravaLog( ::cRotina, ::cTabela, cChaveLog, ::aAlteracoes[nI][1], ;
                 ::DescValor(::aAlteracoes[nI][1], ::aAlteracoes[nI][2]), ;
                 ::DescValor(::aAlteracoes[nI][1], ::aAlteracoes[nI][3]), ;
                 ::cJustificativa )
             lRet := .F.
         EndIf
+
     Next nI
 
 Return lRet
