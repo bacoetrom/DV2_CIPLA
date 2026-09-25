@@ -186,7 +186,7 @@ Static Function MT410TKAcumLinha(nLinha as Numeric, nPosLote as Numeric, nPosIte
 
 	// Sem valor anterior gravado (linha nova) ou sem alteracao efetiva:
 	// nao exige assinatura eletronica.
-	If Empty(cLoteAnt) .Or. cLoteNovo == cLoteAnt
+	If  cLoteNovo == cLoteAnt
 		Return .F.
 	EndIf
 
