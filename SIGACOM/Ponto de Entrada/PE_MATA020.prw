@@ -41,7 +41,7 @@ User Function CUSTOMERVENDOR()
             ElseIf cIdPonto == "FORMPOS"
                 If oModel <> NIL    .And.  nOpc == MODEL_OPERATION_UPDATE
 
-                    oAssEle := ZTLAssinaEletronica():New("CUSTOMERVENDOR", "SA2", SA2->A2_FILIAL + SA2->A2_COD + SA2->A2_LOJA)
+                    oAssEle := ZZ1AssinaEletronica():New("CUSTOMERVENDOR", "SA2", SA2->A2_FILIAL + SA2->A2_COD + SA2->A2_LOJA)
                     oAssEle:SetParamChave("FS_CI02A001")
 
                     For nX := 1 To Len(aCampSens)

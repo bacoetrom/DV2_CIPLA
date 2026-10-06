@@ -3,8 +3,8 @@
 
 #DEFINE CRLF Chr(13)+Chr(10)
 
-/*/{Protheus.doc} ZTLGravaLog
-Grava um registro genérico de auditoria na tabela ZTL.
+/*/{Protheus.doc} ZZ1GravaLog
+Grava um registro genérico de auditoria na tabela ZZ1.
 @type  function
 @version 1.0
 @author Pablo Regis
@@ -17,43 +17,43 @@ Grava um registro genérico de auditoria na tabela ZTL.
 @param xValorNov, variant, "Valor novo (character, numeric, date ou logical - convertido automaticamente para texto antes de gravar)"
 @param cJustif, character, "Justificativa informada pelo usuário"
 @return logical, "retorna .T. se o registro foi gravado com sucesso"
-@table ZTL
+@table ZZ1
 /*/
-User Function ZTLGravaLog(cRotina as Character, cTabela as Character, cChave as Character, cCampo as Character, xValorAnt as Variant, xValorNov as Variant, cJustif as Character) as Logical
+User Function ZZ1GravaLog(cRotina as Character, cTabela as Character, cChave as Character, cCampo as Character, xValorAnt as Variant, xValorNov as Variant, cJustif as Character) as Logical
 
     Local aArea         := GetArea()               as Array
-    Local cFilAux       := xFilial("ZTL")          as Character
+    Local cFilAux       := xFilial("ZZ1")          as Character
     Local cNumSeq       := ""                      as Character
     Local lRet          := .F.                     as Logical
     Local cValorAntFmt  := fValorToChar(xValorAnt) as Character
     Local cValorNovFmt  := fValorToChar(xValorNov) as Character
 
-    DbSelectArea("ZTL")
+    DbSelectArea("ZZ1")
 
     Try
         DbSetOrder(1)
-        cNumSeq := GetSxeNum("ZTL", "ZTL_SEQ")
+        cNumSeq := GetSxeNum("ZZ1", "ZZ1_SEQ")
 
-        RecLock("ZTL", .T.)
-            ZTL->ZTL_FILIAL := cFilAux
-            ZTL->ZTL_SEQ    := Right(cNumSeq, 9)
-            ZTL->ZTL_ROTINA := cRotina
-            ZTL->ZTL_TABELA := cTabela
-            ZTL->ZTL_CHAVE  := cChave
-            ZTL->ZTL_CAMPO  := cCampo
-            ZTL->ZTL_VALANT := cValorAntFmt
-            ZTL->ZTL_VALNOV := cValorNovFmt
-            ZTL->ZTL_JUSTIF := cJustif
-            ZTL->ZTL_USER   := Alltrim(UsrRetName(RetCodUsr()))
-            ZTL->ZTL_DATA   := Date()
-            ZTL->ZTL_HORA   := Time()
+        RecLock("ZZ1", .T.)
+            ZZ1->ZZ1_FILIAL := cFilAux
+            ZZ1->ZZ1_SEQ    := Right(cNumSeq, 9)
+            ZZ1->ZZ1_ROTINA := cRotina
+            ZZ1->ZZ1_TABELA := cTabela
+            ZZ1->ZZ1_CHAVE  := cChave
+            ZZ1->ZZ1_CAMPO  := cCampo
+            ZZ1->ZZ1_VALANT := cValorAntFmt
+            ZZ1->ZZ1_VALNOV := cValorNovFmt
+            ZZ1->ZZ1_JUSTIF := cJustif
+            ZZ1->ZZ1_USER   := Alltrim(UsrRetName(RetCodUsr()))
+            ZZ1->ZZ1_DATA   := Date()
+            ZZ1->ZZ1_HORA   := Time()
         MsUnlock()
 
         ConfirmSX8()
         lRet := .T.
     Catch oError
         RollbackSX8()
-        FWLogMsg("ERROR", , "ZTLGravaLog", cRotina, , "01", oError:Description, 0, 0, {})
+        FWLogMsg("ERROR", , "ZZ1GravaLog", cRotina, , "01", oError:Description, 0, 0, {})
         lRet := .F.
     EndTry
 
@@ -64,7 +64,7 @@ Return lRet
 
 /*/{Protheus.doc} fValorToChar
 Converte um valor de qualquer tipo suportado (character, numeric, date, logical)
-para sua representação em texto, para gravação nos campos ZTL_VALANT/ZTL_VALNOV.
+para sua representação em texto, para gravação nos campos ZZ1_VALANT/ZZ1_VALNOV.
 @type function
 @author Pablo Regis
 @since 10/09/2026

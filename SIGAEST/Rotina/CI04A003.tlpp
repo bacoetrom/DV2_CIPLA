@@ -3,13 +3,13 @@
 #INCLUDE 'rwmake.ch'
 #DEFINE CRLF Chr(13)+Chr(10)
 
-/*/{Protheus.doc} ZZ3AssinaEletronica
+/*/{Protheus.doc} ZZ2AssinaEletronica
 Classe de Assinatura Eletrônica (Justificativa + Senha de login) para
 confirmar a Assinatura Transferência entre Armazens/Depositos (MATA261), com
 gravacao automatica do log de auditoria de todos os itens transferidos
-(aCols) na tabela ZZ3 (U_ZZ3GravaLog, ver CI04A003.tlpp).
+(aCols) na tabela ZZ2 (U_ZZ2GravaLog, ver CI04A003.tlpp).
 
-Diferente da ZTLAssinaEletronica (SIGACOM/ZTLU002.tlpp), o layout de
+Diferente da ZZ1AssinaEletronica (SIGACOM/ZZ1U002.tlpp), o layout de
 confirmação aqui NAO exibe lista de alteracoes de campo, pois toda
 Assinatura Transferência confirmada e sempre registrada, independente de haver ou
 nao alteracao de valores.
@@ -19,7 +19,7 @@ nao alteracao de valores.
 @author Pablo Regis
 @since 24/09/2026
 /*/
-Class ZZ3AssinaEletronica
+Class ZZ2AssinaEletronica
 
     Private Data cRotina        as Character
     Private Data cDocNum        as Character
@@ -43,8 +43,8 @@ Class ZZ3AssinaEletronica
     Private Method MontaMsgItens() as Character
     Private Method ValidaSenha(cSenha as Character) as Logical
     // Publicos: acionados pela Static Function de callback do BMPBUTTON de
-    // confirmação (fConfirmaZZ3AssEle), fora do escopo da classe, no mesmo
-    // padrao de fConfirmaZTLAssEle() usado como base em ZTLU002.tlpp
+    // confirmação (fConfirmaZZ2AssEle), fora do escopo da classe, no mesmo
+    // padrao de fConfirmaZZ1AssEle() usado como base em ZZ1U002.tlpp
     Public Method ValidaCampos(cSenha as Character, cJustif as Character) as Logical
     Public Method FechaSeValido(oDlg as Object, lValido as Logical) as Logical
     Private Method GravaLog() as Logical
@@ -52,7 +52,7 @@ Class ZZ3AssinaEletronica
 EndClass
 
 /*/{Protheus.doc} New
-Construtor. Recebe os dados minimos exigidos por U_ZZ3GravaLog para
+Construtor. Recebe os dados minimos exigidos por U_ZZ2GravaLog para
 identificar a origem do registro de auditoria. As posicoes de grid
 (aCols) ja iniciam com o padrao confirmado para o MATA261: Produto=1,
 Quantidade=16, Armazem Origem=4, Armazem Destino=9 (ver SetPosicoesGrid
@@ -65,7 +65,7 @@ para alterar em outra rotina).
 @param cOrigem, character, "Origem do processo: 1=Manual/Interativo, 2=Automatico"
 @return object, "instancia da classe (permite chamadas encadeadas)"
 /*/
-Method New(cRotina as Character, cDocNum as Character, cOrigem as Character) as Object Class ZZ3AssinaEletronica
+Method New(cRotina as Character, cDocNum as Character, cOrigem as Character) as Object Class ZZ2AssinaEletronica
 
     ::cRotina        := AllTrim(cRotina)
     ::cDocNum        := AllTrim(cDocNum)
@@ -89,7 +89,7 @@ usa o titulo padrao "Assinatura Eletrônica - Assinatura Transferência".
 @param cTitulo, character, "Titulo da janela de confirmação"
 @return object, "instancia da classe (permite chamadas encadeadas)"
 /*/
-Method SetTitulo(cTitulo as Character) as Object Class ZZ3AssinaEletronica
+Method SetTitulo(cTitulo as Character) as Object Class ZZ2AssinaEletronica
 
     ::cTitulo := AllTrim(cTitulo)
 
@@ -109,7 +109,7 @@ MATA261.
 @param nPosArmDes, numeric, "Indice do Armazem de Destino em aCols[n]"
 @return object, "instancia da classe (permite chamadas encadeadas)"
 /*/
-Method SetPosicoesGrid(nPosProduto as Numeric, nPosQuant as Numeric, nPosArmOri as Numeric, nPosArmDes as Numeric) as Object Class ZZ3AssinaEletronica
+Method SetPosicoesGrid(nPosProduto as Numeric, nPosQuant as Numeric, nPosArmOri as Numeric, nPosArmDes as Numeric) as Object Class ZZ2AssinaEletronica
 
     ::nPosProduto := nPosProduto
     ::nPosQuant   := nPosQuant
@@ -121,14 +121,14 @@ Return Self
 /*/{Protheus.doc} SetItens
 Define a grid de itens da Assinatura Transferência (aCols da rotina padrao
 MATA261) que serao percorridos e gravados, um a um, no log de
-auditoria da ZZ3 quando a confirmação for validada.
+auditoria da ZZ2 quando a confirmação for validada.
 @type method
 @author Pablo Regis
 @since 24/09/2026
 @param aItens, array, "Array de linhas da grid (aCols), cada linha contendo ao menos as posicoes de Produto/Quantidade/Armazem Origem/Armazem Destino"
 @return object, "instancia da classe (permite chamadas encadeadas)"
 /*/
-Method SetItens(aItens as Array) as Object Class ZZ3AssinaEletronica
+Method SetItens(aItens as Array) as Object Class ZZ2AssinaEletronica
 
     ::aItens := aItens
 
@@ -137,8 +137,8 @@ Return Self
 /*/{Protheus.doc} Confirma
 Exibe a janela de Assinatura Eletrônica (Justificativa + Senha de
 login), valida os dados informados e, quando confirmados, grava um
-registro de auditoria por item transferido via U_ZZ3GravaLog. Nao
-exibe lista de alteracoes de campo (diferente da ZTLAssinaEletronica),
+registro de auditoria por item transferido via U_ZZ2GravaLog. Nao
+exibe lista de alteracoes de campo (diferente da ZZ1AssinaEletronica),
 pois toda Assinatura Transferência confirmada e sempre registrada. Quando nao ha
 nenhum item em aItens (SetItens), retorna .T. imediatamente sem exibir
 tela.
@@ -147,17 +147,17 @@ tela.
 @since 24/09/2026
 @return logical, ".T. se nao havia item a confirmar, ou se Senha/Justificativa foram validadas e o log foi gravado com sucesso; .F. se o usuario cancelou, informou dados inválidos, ou a gravacao do log falhou"
 /*/
-Method Confirma() as Logical Class ZZ3AssinaEletronica
+Method Confirma() as Logical Class ZZ2AssinaEletronica
 
     Local cNomUsr    := AllTrim(UsrRetName(RetCodUsr())) as Character
     Local cTituloDlg := ::cTitulo                        as Character
     Local lRet       := .T.                              as Logical
 
-    Private _oDlgZZ3Ass    := Nil          as Object
-    Private _oSelfZZ3Ass   := Nil          as Object
-    Private _lOpZZ3Ass     := .F.          as Logical
-    Private _cSenhaZZ3Ass  := Space(40)    as Character
-    Private _cJustifZZ3Ass := Space(255)   as Character
+    Private _oDlgZZ2Ass    := Nil          as Object
+    Private _oSelfZZ2Ass   := Nil          as Object
+    Private _lOpZZ2Ass     := .F.          as Logical
+    Private _cSenhaZZ2Ass  := Space(40)    as Character
+    Private _cJustifZZ2Ass := Space(255)   as Character
 
     If Len(::aItens) == 0
         Return .T.
@@ -166,7 +166,7 @@ Method Confirma() as Logical Class ZZ3AssinaEletronica
     ProcLogIni({}, ::cRotina)
     ProcLogAtu("INICIO")
 
-    _oSelfZZ3Ass := Self
+    _oSelfZZ2Ass := Self
 
     ProcLogAtu("MENSAGEM", "INFO", "Tentativa de confirmação de Assinatura Transferência via Assinatura Eletrônica" + CRLF + ;
         "Rotina: " + ::cRotina + CRLF + ;
@@ -176,38 +176,38 @@ Method Confirma() as Logical Class ZZ3AssinaEletronica
         "Usuario Logado: " + cNomUsr)
 
     // Dialogo montado com os mesmos comandos classicos (@ .. DIALOG / @ .. GET /
-    // BMPBUTTON / ACTIVATE DIALOG) usados como base em ZTLAssinaEletronica
-    // (ZTLU002.tlpp). O GET classico exige memvar (Private) ligada por nome,
+    // BMPBUTTON / ACTIVATE DIALOG) usados como base em ZZ1AssinaEletronica
+    // (ZZ1U002.tlpp). O GET classico exige memvar (Private) ligada por nome,
     // por isso os campos de tela usam as Privates acima (nao ::atributo). Pelo
     // mesmo motivo, a acao do BMPBUTTON de confirmação delega para a Static
-    // Function fConfirmaZZ3AssEle(), que aciona a instancia guardada em
-    // _oSelfZZ3Ass
-    @ 000,000 TO 350,350 DIALOG _oDlgZZ3Ass TITLE cTituloDlg
+    // Function fConfirmaZZ2AssEle(), que aciona a instancia guardada em
+    // _oSelfZZ2Ass
+    @ 000,000 TO 350,350 DIALOG _oDlgZZ2Ass TITLE cTituloDlg
         @ 008,008 SAY "Documento: " + ::cDocNum
         @ 008,120 SAY "Usuario: " + cNomUsr
         @ 022,008 SAY "Justificativa da Assinatura Transferência (obrigatoria):"
-        @ 032,008 GET _cJustifZZ3Ass MEMO SIZE 150,040
+        @ 032,008 GET _cJustifZZ2Ass MEMO SIZE 150,040
         @ 084,008 SAY "Redigite sua senha de login ("+cNomUsr+") para confirmar:"
         @ 094,008 SAY "Senha: "
-        @ 094,045 GET _cSenhaZZ3Ass PICTURE "@S40" VALID .T. PASSWORD OBJECT oSenhaZZ3Ass
-        @ 125,060 BMPBUTTON TYPE 1 ACTION fConfirmaZZ3AssEle()
+        @ 094,045 GET _cSenhaZZ2Ass PICTURE "@S40" VALID .T. PASSWORD OBJECT oSenhaZZ2Ass
+        @ 125,060 BMPBUTTON TYPE 1 ACTION fConfirmaZZ2AssEle()
         @ 125,090 BUTTON "Auditoria" SIZE 35,11 ACTION PROCLOGVIEW()
-    ACTIVATE DIALOG _oDlgZZ3Ass CENTERED
+    ACTIVATE DIALOG _oDlgZZ2Ass CENTERED
 
-    If !_lOpZZ3Ass
+    If !_lOpZZ2Ass
         MsgStop("Operacao cancelada, ou Senha/Justificativa inválidas. A Assinatura Transferência nao sera confirmada.", "Cancelamento")
         ProcLogAtu("MENSAGEM", "FALHA", "Operacao cancelada ou dados inválidos informados pelo usuario " + cNomUsr + ". Assinatura Transferência nao efetivada.")
         ProcLogAtu("FIM")
         Return .F.
     EndIf
 
-    ::cJustificativa := AllTrim(_cJustifZZ3Ass)
+    ::cJustificativa := AllTrim(_cJustifZZ2Ass)
 
     lRet := ::GravaLog()
 
     If !lRet
         MsgStop("Falha ao gravar o log de auditoria de um ou mais itens da Assinatura Transferência.", "Auditoria")
-        ProcLogAtu("MENSAGEM", "FALHA", "Falha ao gravar log de auditoria via ZZ3GravaLog.")
+        ProcLogAtu("MENSAGEM", "FALHA", "Falha ao gravar log de auditoria via ZZ2GravaLog.")
     Else
         ProcLogAtu("MENSAGEM", "SUCESSO", "Senha validada. Assinatura Transferência confirmada: " + CRLF + ::MontaMsgItens())
     EndIf
@@ -227,7 +227,7 @@ validar Senha.
 @param cJustificativa, character, "Justificativa a ser gravada em todos os itens"
 @return logical, ".T. se todos os itens foram gravados com sucesso"
 /*/
-Method GravaAutomatico(cJustificativa as Character) as Logical Class ZZ3AssinaEletronica
+Method GravaAutomatico(cJustificativa as Character) as Logical Class ZZ2AssinaEletronica
 
     ::cJustificativa := AllTrim(cJustificativa)
 
@@ -241,7 +241,7 @@ Confirma()/GravaAutomatico() bem sucedida.
 @since 24/09/2026
 @return character, "Justificativa informada, ou vazio se ainda nao confirmada"
 /*/
-Method GetJustificativa() as Character Class ZZ3AssinaEletronica
+Method GetJustificativa() as Character Class ZZ2AssinaEletronica
 Return ::cJustificativa
 
 /*/{Protheus.doc} MontaMsgItens
@@ -252,7 +252,7 @@ todos os itens em aItens, exibida no log de INFO.
 @since 24/09/2026
 @return character, "Mensagem consolidada, uma linha por item"
 /*/
-Method MontaMsgItens() as Character Class ZZ3AssinaEletronica
+Method MontaMsgItens() as Character Class ZZ2AssinaEletronica
 
     Local cMsg := "" as Character
     Local nI   := 0  as Numeric
@@ -268,8 +268,8 @@ Return cMsg
 
 /*/{Protheus.doc} ValidaSenha
 Valida a senha digitada contra a senha do proprio usuario logado,
-usando o mesmo criterio ja em producao em ZTLAssinaEletronica
-(ZTLU002.tlpp): PswOrder(2) + PswSeek(cNomUsr, .T.), comparando o valor
+usando o mesmo criterio ja em producao em ZZ1AssinaEletronica
+(ZZ1U002.tlpp): PswOrder(2) + PswSeek(cNomUsr, .T.), comparando o valor
 bruto retornado por PswRet() e, como alternativa, PswName().
 @type method
 @author Pablo Regis
@@ -277,7 +277,7 @@ bruto retornado por PswRet() e, como alternativa, PswName().
 @param cSenha, character, "Senha digitada pelo usuario a validar"
 @return logical, ".T. se a senha do usuario logado esta correta"
 /*/
-Method ValidaSenha(cSenha as Character) as Logical Class ZZ3AssinaEletronica
+Method ValidaSenha(cSenha as Character) as Logical Class ZZ2AssinaEletronica
 
     Local cNomUsr := AllTrim(UsrRetName(RetCodUsr())) as Character
     Local aRetPsw as Array
@@ -307,7 +307,7 @@ Confirma().
 @param cJustif, character, "Justificativa digitada"
 @return logical, ".T. se Justificativa e Senha sao ambas validas"
 /*/
-Method ValidaCampos(cSenha as Character, cJustif as Character) as Logical Class ZZ3AssinaEletronica
+Method ValidaCampos(cSenha as Character, cJustif as Character) as Logical Class ZZ2AssinaEletronica
 
     If Empty(AllTrim(cJustif))
         MsgAlert("Informe a justificativa da Assinatura Transferência antes de confirmar.", "Atencao")
@@ -332,7 +332,7 @@ dados em caso de falha.
 @param lValido, logical, ".T. fecha o dialogo"
 @return logical, "o proprio valor de lValido recebido"
 /*/
-Method FechaSeValido(oDlg as Object, lValido as Logical) as Logical Class ZZ3AssinaEletronica
+Method FechaSeValido(oDlg as Object, lValido as Logical) as Logical Class ZZ2AssinaEletronica
 
     If lValido
         Close(oDlg)
@@ -342,14 +342,14 @@ Return lValido
 
 /*/{Protheus.doc} GravaLog
 Percorre todos os itens em aItens e grava um registro de auditoria por
-item no log da ZZ3 via U_ZZ3GravaLog (ver CI04A003.tlpp), usando a
+item no log da ZZ2 via U_ZZ2GravaLog (ver CI04A003.tlpp), usando a
 Justificativa confirmada em Confirma()/GravaAutomatico().
 @type method
 @author Pablo Regis
 @since 24/09/2026
 @return logical, ".T. se todos os itens foram gravados com sucesso"
 /*/
-Method GravaLog() as Logical Class ZZ3AssinaEletronica
+Method GravaLog() as Logical Class ZZ2AssinaEletronica
 
     Local nI       := 0  as Numeric
     Local lRet     := .T. as Logical
@@ -365,7 +365,7 @@ Method GravaLog() as Logical Class ZZ3AssinaEletronica
         cArmOri  := AllTrim(::aItens[nI][::nPosArmOri])
         cArmDes  := AllTrim(::aItens[nI][::nPosArmDes])
 
-        If !U_ZZ3GravaLog(::cRotina, ::cDocNum, cProduto, nQuant, cArmOri, cArmDes, ::cJustificativa, ::cOrigem)
+        If !U_ZZ2GravaLog(::cRotina, ::cDocNum, cProduto, nQuant, cArmOri, cArmDes, ::cJustificativa, ::cOrigem)
             lRet := .F.
         EndIf
 
@@ -373,21 +373,21 @@ Method GravaLog() as Logical Class ZZ3AssinaEletronica
 
 Return lRet
 
-/*/{Protheus.doc} fConfirmaZZ3AssEle
+/*/{Protheus.doc} fConfirmaZZ2AssEle
 Valida a obrigatoriedade da Justificativa e a Senha de login antes de
 permitir o fechamento do dialogo classico de Assinatura Eletrônica
-montado em ZZ3AssinaEletronica:Confirma(). Existe como Static Function
+montado em ZZ2AssinaEletronica:Confirma(). Existe como Static Function
 (fora da classe) porque o BMPBUTTON classico so aceita uma chamada de
 funcao simples em ACTION, e aciona a instancia da classe guardada na
-Private _oSelfZZ3Ass.
+Private _oSelfZZ2Ass.
 @type function
 @author Pablo Regis
 @since 24/09/2026
 @return logical, ".T. se os dados informados sao validos e o dialogo foi fechado"
 /*/
-Static Function fConfirmaZZ3AssEle() as Logical
+Static Function fConfirmaZZ2AssEle() as Logical
 
-    _lOpZZ3Ass := _oSelfZZ3Ass:ValidaCampos(_cSenhaZZ3Ass, _cJustifZZ3Ass)
-    _oSelfZZ3Ass:FechaSeValido(_oDlgZZ3Ass, _lOpZZ3Ass)
+    _lOpZZ2Ass := _oSelfZZ2Ass:ValidaCampos(_cSenhaZZ2Ass, _cJustifZZ2Ass)
+    _oSelfZZ2Ass:FechaSeValido(_oDlgZZ2Ass, _lOpZZ2Ass)
 
-Return _lOpZZ3Ass
+Return _lOpZZ2Ass

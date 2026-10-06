@@ -1,8 +1,8 @@
 #include "tlpp-core.th"
 #include "totvs.ch"
 
-/*/{Protheus.doc} ZZ3GravaLog
-Gravação de auditoria na tabela ZZ3
+/*/{Protheus.doc} ZZ2GravaLog
+Gravação de auditoria na tabela ZZ2
 @type function
 @version 1.0  
 @author Pablo Regis
@@ -17,33 +17,33 @@ Gravação de auditoria na tabela ZZ3
 @param cOrigem, character, origem da transferencia
 @return logical, ".T. se o registro foi gravado com sucesso, ".F." caso contrario
 /*/
-User Function ZZ3GravaLog(cRotina, cDocNum, cProduto, nQuant, cArmOri, cArmDes, cJustificativa, cOrigem)
+User Function ZZ2GravaLog(cRotina, cDocNum, cProduto, nQuant, cArmOri, cArmDes, cJustificativa, cOrigem)
     Local aArea         := GetArea()               as Array
     Local lRet      := .T. as Logical
 
     Try
 
-        DbSelectArea("ZZ3")
+        DbSelectArea("ZZ2")
         DbSetOrder(1) 
 
-        If RecLock("ZZ3", .T.)
-            ZZ3->ZZ3_FILIAL  := xFilial("ZZ3")
-            ZZ3->ZZ3_DOC     := cDocNum
-            ZZ3->ZZ3_PRODUT  := cProduto
-            ZZ3->ZZ3_QUANT   := nQuant
-            ZZ3->ZZ3_ARMORI  := cArmOri
-            ZZ3->ZZ3_ARMDES  := cArmDes
-            ZZ3->ZZ3_ORIGEM  := cOrigem
-            ZZ3->ZZ3_JUSTIF  := AllTrim(cJustificativa)
-            ZZ3->ZZ3_USUARIO := Alltrim(UsrRetName(RetCodUsr()))
-            ZZ3->ZZ3_DATA    := Date()
-            ZZ3->ZZ3_HORA    := Time()            
-            ZZ3->(MsUnlock())
+        If RecLock("ZZ2", .T.)
+            ZZ2->ZZ2_FILIAL  := xFilial("ZZ2")
+            ZZ2->ZZ2_DOC     := cDocNum
+            ZZ2->ZZ2_PRODUT  := cProduto
+            ZZ2->ZZ2_QUANT   := nQuant
+            ZZ2->ZZ2_ARMORI  := cArmOri
+            ZZ2->ZZ2_ARMDES  := cArmDes
+            ZZ2->ZZ2_ORIGEM  := cOrigem
+            ZZ2->ZZ2_JUSTIF  := AllTrim(cJustificativa)
+            ZZ2->ZZ2_USUARIO := Alltrim(UsrRetName(RetCodUsr()))
+            ZZ2->ZZ2_DATA    := Date()
+            ZZ2->ZZ2_HORA    := Time()            
+            ZZ2->(MsUnlock())
         EndIf
 
     Catch oError
         RollbackSX8()
-        FWLogMsg("ERROR", , "ZTLGravaLog", cRotina, , "01", oError:Description, 0, 0, {})
+        FWLogMsg("ERROR", , "ZZ1GravaLog", cRotina, , "01", oError:Description, 0, 0, {})
         lRet := .F.
     EndTry
 

@@ -4,17 +4,17 @@
 #INCLUDE "TBICONN.CH"
 #DEFINE CRLF Chr(13)+Chr(10)
 
-/*/{Protheus.doc} ZTLAssinaEletronica
+/*/{Protheus.doc} ZZ1AssinaEletronica
 Classe genérica de Assinatura Eletrônica (Justificativa + Senha de login
 + Chave de autorização) para confirmar a alteração de campos sensíveis de
 qualquer tabela/rotina, com gravação automática do log de auditoria no
-motor genérico ZTL (U_ZTLGravaLog, ver ZTLU001.tlpp).
+motor genérico ZZ1 (U_ZZ1GravaLog, ver ZZ1U001.tlpp).
 @type class
 @version 1.0
 @author Pablo Regis
 @since 16/09/2026
 /*/
-Class ZTLAssinaEletronica
+Class ZZ1AssinaEletronica
 
     Private Data cRotina        as Character
     Private Data cTabela        as Character
@@ -47,7 +47,7 @@ Class ZTLAssinaEletronica
 EndClass
 
 /*/{Protheus.doc} New
-Construtor. Recebe os dados mínimos exigidos por U_ZTLGravaLog para
+Construtor. Recebe os dados mínimos exigidos por U_ZZ1GravaLog para
 identificar a origem do registro de auditoria.
 @type method
 @author Pablo Regis
@@ -57,7 +57,7 @@ identificar a origem do registro de auditoria.
 @param cChaveReg, character, "Chave do registro afetado, já concatenada pelo chamador (ex.: SA2->A2_FILIAL+A2_COD+A2_LOJA)"
 @return object, "instância da classe (permite chamadas encadeadas)"
 /*/
-Method New(cRotina as Character, cTabela as Character, cChaveReg as Character) as Object Class ZTLAssinaEletronica
+Method New(cRotina as Character, cTabela as Character, cChaveReg as Character) as Object Class ZZ1AssinaEletronica
 
     ::cRotina        := AllTrim(cRotina)
     ::cTabela        := AllTrim(cTabela)
@@ -79,7 +79,7 @@ usa o título padrão "Assinatura Eletrônica".
 @param cTitulo, character, "Título da janela de confirmação"
 @return object, "instância da classe (permite chamadas encadeadas)"
 /*/
-Method SetTitulo(cTitulo as Character) as Object Class ZTLAssinaEletronica
+Method SetTitulo(cTitulo as Character) as Object Class ZZ1AssinaEletronica
 
     ::cTitulo := AllTrim(cTitulo)
 
@@ -99,7 +99,7 @@ parâmetro no dicionário SX6).
 @param cChaveDefault, character, "Valor default da chave quando o parâmetro não estiver cadastrado; se vazio, mantém o default corrente"
 @return object, "instância da classe (permite chamadas encadeadas)"
 /*/
-Method SetParamChave(cParam as Character, cChaveDefault as Character) as Object Class ZTLAssinaEletronica
+Method SetParamChave(cParam as Character, cChaveDefault as Character) as Object Class ZZ1AssinaEletronica
 
     ::cParamChave := AllTrim(cParam)
 
@@ -124,10 +124,10 @@ parâmetros opcionais cItemLabel/cChaveItem.
 @param xValorAnt, variant, "Valor anterior do campo"
 @param xValorNovo, variant, "Valor novo do campo"
 @param cItemLabel, character, "Identificação opcional do registro/item (ex.: 'Item 0001'), exibida como prefixo na tela e no log de INFO quando uma mesma confirmação reune alterações de mais de um registro físico; vazio (default) quando a confirmação trata um único registro, mantendo o comportamento clássico de CI02A001/A010TOK"
-@param cChaveItem, character, "Chave específica deste registro para gravação no log de auditoria (ZTL_CHAVE), usada no lugar da chave informada no construtor; vazio (default) usa a chave do construtor (::cChaveReg), mantendo o comportamento clássico de CI02A001/A010TOK onde todas as alterações pertencem ao mesmo registro"
+@param cChaveItem, character, "Chave específica deste registro para gravação no log de auditoria (ZZ1_CHAVE), usada no lugar da chave informada no construtor; vazio (default) usa a chave do construtor (::cChaveReg), mantendo o comportamento clássico de CI02A001/A010TOK onde todas as alterações pertencem ao mesmo registro"
 @return object, "instância da classe (permite chamadas encadeadas)"
 /*/
-Method AddAlteracao(cCampo as Character, xValorAnt, xValorNovo, cItemLabel as Character, cChaveItem as Character) as Object Class ZTLAssinaEletronica
+Method AddAlteracao(cCampo as Character, xValorAnt, xValorNovo, cItemLabel as Character, cChaveItem as Character) as Object Class ZZ1AssinaEletronica
 
     aAdd(::aAlteracoes, {AllTrim(cCampo), xValorAnt, xValorNovo, AllTrim(cItemLabel), AllTrim(cChaveItem)})
 
@@ -143,7 +143,7 @@ U_CI02A001 (cada item {cCampo, cValorAnt, cValorNovo}).
 @param aAlteracoes, array, "Array de alterações {cCampo, xValorAnt, xValorNovo}"
 @return object, "instância da classe (permite chamadas encadeadas)"
 /*/
-Method SetAlteracoes(aAlteracoes as Array) as Object Class ZTLAssinaEletronica
+Method SetAlteracoes(aAlteracoes as Array) as Object Class ZZ1AssinaEletronica
 
     ::aAlteracoes := aAlteracoes
 
@@ -153,7 +153,7 @@ Return Self
 Exibe a janela única de Assinatura Eletrônica (lista de alterações,
 Justificativa, Senha de login e Chave de autorização), valida os
 dados informados e, quando confirmados, grava um registro de
-auditoria por campo alterado via U_ZTLGravaLog. Quando não há
+auditoria por campo alterado via U_ZZ1GravaLog. Quando não há
 nenhuma alteração adicionada (AddAlteracao/SetAlteracoes), retorna
 .T. imediatamente sem exibir tela, no mesmo comportamento do
 CI02A001. Cabe ao chamador decidir SE deve chamar Confirma() (ex.:
@@ -164,7 +164,7 @@ próprio CI02A001 e A010TOK já fazem.
 @since 16/09/2026
 @return logical, ".T. se não havia alteração a confirmar, ou se a Senha/Chave/Justificativa foram validadas e o log foi gravado com sucesso; .F. se o usuário cancelou, informou dados inválidos, ou a gravação do log falhou"
 /*/
-Method Confirma() as Logical Class ZTLAssinaEletronica
+Method Confirma() as Logical Class ZZ1AssinaEletronica
 
     Local cNomUsr    := AllTrim(UsrRetName(RetCodUsr())) as Character
     Local cMsgAlt    := ""                               as Character
@@ -210,7 +210,7 @@ Method Confirma() as Logical Class ZTLAssinaEletronica
         @ 185,45 GET _cSenhaAssEle PICTURE "@S40" VALID .T. PASSWORD Object oSenhaAssEle
         // @ 200,02 SAY "Chave: "
         // @ 200,45 GET _cChaveAssEle PICTURE "@S40" VALID .T. PASSWORD Object oChaveAssEle
-        @ 220,060 BMPBUTTON TYPE 1 ACTION fConfirmaZTLAssEle()
+        @ 220,060 BMPBUTTON TYPE 1 ACTION fConfirmaZZ1AssEle()
         @ 220,090 BUTTON "Auditoria" SIZE 35,11 ACTION PROCLOGVIEW()
     ACTIVATE DIALOG _oDlgAssEle CENTERED
 
@@ -230,7 +230,7 @@ Method Confirma() as Logical Class ZTLAssinaEletronica
         ProcLogAtu("MENSAGEM", "SUCESSO", "Senha validada. Alterações efetivadas: " + CRLF + cMsgAlt)
     Else
         MsgStop("Falha ao gravar o log de auditoria de uma ou mais alterações.", "Auditoria")
-        ProcLogAtu("MENSAGEM", "FALHA", "Falha ao gravar log de auditoria via ZTLGravaLog.")
+        ProcLogAtu("MENSAGEM", "FALHA", "Falha ao gravar log de auditoria via ZZ1GravaLog.")
     EndIf
 
     ProcLogAtu("FIM")
@@ -245,7 +245,7 @@ Confirma() bem sucedida.
 @since 16/09/2026
 @return character, "Justificativa informada, ou vazio se Confirma() ainda não foi chamado/confirmado"
 /*/
-Method GetJustificativa() as Character Class ZTLAssinaEletronica
+Method GetJustificativa() as Character Class ZZ1AssinaEletronica
 Return ::cJustificativa
 
 /*/{Protheus.doc} MontaMsgAlteracoes
@@ -257,7 +257,7 @@ INFO, no mesmo formato hoje usado pelo CI02A001.
 @since 16/09/2026
 @return character, "Mensagem consolidada, uma linha por alteração"
 /*/
-Method MontaMsgAlteracoes() as Character Class ZTLAssinaEletronica
+Method MontaMsgAlteracoes() as Character Class ZZ1AssinaEletronica
 
     Local cMsg   := "" as Character
     Local cLabel := "" as Character
@@ -287,7 +287,7 @@ CI02A001.tlpp.
 @param cCampo, character, "Nome do campo (ex.: 'A2_MSBLQL')"
 @return character, "Título do campo (X3_TITULO); quando não encontrado no dicionário, retorna o próprio nome do campo"
 /*/
-Method TituloCampo(cCampo as Character) as Character Class ZTLAssinaEletronica
+Method TituloCampo(cCampo as Character) as Character Class ZZ1AssinaEletronica
 
     Local cAliasAnt := Alias()          as Character
     Local cTitulo   := AllTrim(cCampo)  as Character
@@ -315,7 +315,7 @@ quando aplicável, para uso exclusivo na mensagem exibida ao usuário
 @param xValor, variant, "Conteúdo do campo"
 @return character, "Descrição amigável do valor"
 /*/
-Method DescValor(cCampo as Character, xValor) as Character Class ZTLAssinaEletronica
+Method DescValor(cCampo as Character, xValor) as Character Class ZZ1AssinaEletronica
 
     Local cDesc := "" as Character
 
@@ -334,7 +334,7 @@ Return cDesc
 /*/{Protheus.doc} ValorParaChar
 Converte um valor de qualquer tipo suportado (C/N/D/L/U) para
 Character bruto (sem consulta a X3Combo), para uso exclusivo na
-gravação do log de auditoria (U_ZTLGravaLog exige Character), onde o
+gravação do log de auditoria (U_ZZ1GravaLog exige Character), onde o
 valor persistido deve ser o mesmo valor gravado no banco, e não a
 descrição amigável exibida em tela.
 @type method
@@ -343,7 +343,7 @@ descrição amigável exibida em tela.
 @param xValor, variant, "Valor a converter"
 @return character, "Valor convertido para Character"
 /*/
-Method ValorParaChar(xValor) as Character Class ZTLAssinaEletronica
+Method ValorParaChar(xValor) as Character Class ZZ1AssinaEletronica
 
     Local cRet := "" as Character
 
@@ -383,7 +383,7 @@ adotado nos fontes modelo.
 @param cSenha, character, "Senha digitada pelo usuário a validar"
 @return logical, ".T. se a senha do usuário logado está correta"
 /*/
-Method ValidaSenha(cSenha as Character) as Logical Class ZTLAssinaEletronica
+Method ValidaSenha(cSenha as Character) as Logical Class ZZ1AssinaEletronica
 
     Local cNomUsr := AllTrim(UsrRetName(RetCodUsr())) as Character
     Local aRetPsw  as Array
@@ -411,7 +411,7 @@ construtor), no mesmo padrão do parâmetro FS_CI02A001/FS_MT410TK.
 @param cChave, character, "Chave digitada pelo usuário"
 @return logical, ".T. se a chave digitada confere com o parâmetro de sistema"
 /*/
-Method ValidaChave(cChave as Character) as Logical Class ZTLAssinaEletronica
+Method ValidaChave(cChave as Character) as Logical Class ZZ1AssinaEletronica
 
     Local cChaveOk := SuperGetMv(::cParamChave, .F., ::cChaveDefault) as Character
 
@@ -430,7 +430,7 @@ do diálogo montado em Confirma().
 @param cJustif, character, "Justificativa digitada"
 @return logical, ".T. se Justificativa, Senha e Chave são todas válidas"
 /*/
-Method ValidaCampos(cSenha as Character, cChave as Character, cJustif as Character) as Logical Class ZTLAssinaEletronica
+Method ValidaCampos(cSenha as Character, cChave as Character, cJustif as Character) as Logical Class ZZ1AssinaEletronica
 
     If Empty(AllTrim(cJustif))
         MsgAlert("Informe a justificativa da alteração antes de confirmar.", "Atenção")
@@ -460,7 +460,7 @@ dados em caso de falha (mesmo comportamento do CI02A001/MT410TOK).
 @param lValido, logical, ".T. fecha o diálogo"
 @return logical, "o próprio valor de lValido recebido"
 /*/
-Method FechaSeValido(oDlg as Object, lValido as Logical) as Logical Class ZTLAssinaEletronica
+Method FechaSeValido(oDlg as Object, lValido as Logical) as Logical Class ZZ1AssinaEletronica
 
     If lValido
         Close(oDlg)
@@ -470,8 +470,8 @@ Return lValido
 
 /*/{Protheus.doc} GravaLog
 Percorre todas as alterações adicionadas e grava um registro de
-auditoria por campo no motor genérico ZTL via U_ZTLGravaLog (ver
-ZTLU001.tlpp), usando a Justificativa confirmada em Confirma(). Quando
+auditoria por campo no motor genérico ZZ1 via U_ZZ1GravaLog (ver
+ZZ1U001.tlpp), usando a Justificativa confirmada em Confirma(). Quando
 uma alteração específica informou cChaveItem (ver AddAlteracao), usa
 essa chave no lugar de ::cChaveReg, permitindo que uma única
 confirmação grave um registro de log por item/registro físico
@@ -481,7 +481,7 @@ efetivamente alterado (ex.: MT410TOK).
 @since 16/09/2026
 @return logical, ".T. se todos os registros foram gravados com sucesso"
 /*/
-Method GravaLog() as Logical Class ZTLAssinaEletronica
+Method GravaLog() as Logical Class ZZ1AssinaEletronica
 
     Local nI        := 0  as Numeric
     Local lRet      := .T. as Logical
@@ -494,7 +494,7 @@ Method GravaLog() as Logical Class ZTLAssinaEletronica
             cChaveLog := ::aAlteracoes[nI][5]
         EndIf
         
-        If !U_ZTLGravaLog( ::cRotina, ::cTabela, cChaveLog, ::aAlteracoes[nI][1], ;
+        If !U_ZZ1GravaLog( ::cRotina, ::cTabela, cChaveLog, ::aAlteracoes[nI][1], ;
                 ::DescValor(::aAlteracoes[nI][1], ::aAlteracoes[nI][2]), ;
                 ::DescValor(::aAlteracoes[nI][1], ::aAlteracoes[nI][3]), ;
                 ::cJustificativa )
@@ -505,10 +505,10 @@ Method GravaLog() as Logical Class ZTLAssinaEletronica
 
 Return lRet
 
-/*/{Protheus.doc} fConfirmaZTLAssEle
+/*/{Protheus.doc} fConfirmaZZ1AssEle
 Valida a obrigatoriedade da Justificativa, a Senha de login e a Chave
 de autorização antes de permitir o fechamento do diálogo clássico de
-Assinatura Eletrônica montado em ZTLAssinaEletronica:Confirma().
+Assinatura Eletrônica montado em ZZ1AssinaEletronica:Confirma().
 Equivalente ao fConfirmaCICO() do CI02A001.tlpp: existe como Static
 Function (fora da classe) porque o BMPBUTTON clássico só aceita uma
 chamada de função simples em ACTION, e aciona a instância da classe
@@ -518,7 +518,7 @@ guardada na Private _oSelfAssEle.
 @since 16/09/2026
 @return logical, ".T. se os dados informados são válidos e o diálogo foi fechado"
 /*/
-Static Function fConfirmaZTLAssEle() as Logical
+Static Function fConfirmaZZ1AssEle() as Logical
 
     _lOpAssEle := _oSelfAssEle:ValidaCampos(_cSenhaAssEle, _cChaveAssEle, _cJustifAssEle)
     _oSelfAssEle:FechaSeValido(_oDlgAssEle, _lOpAssEle)

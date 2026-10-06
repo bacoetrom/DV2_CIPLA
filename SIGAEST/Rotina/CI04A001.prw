@@ -2,7 +2,7 @@
 #Include "FWMVCDef.ch"
 
 /*/{Protheus.doc} CI04A001
-Rotina de consulta em MVC da Tabela de Auditoria de Transferencias (ZZ3).
+Rotina de consulta em MVC da Tabela de Auditoria de Transferencias (ZZ2).
 @type function
 @author  Desenvolvedor Protheus
 @since   22/09/2026
@@ -10,12 +10,12 @@ Rotina de consulta em MVC da Tabela de Auditoria de Transferencias (ZZ3).
 User Function CI04A001()
     Local oBrowse := FWMBrowse():New()
     
-    oBrowse:SetAlias("ZZ3")
+    oBrowse:SetAlias("ZZ2")
     oBrowse:SetDescription("Consulta de Auditoria - Transferencia entre Armazens")
     
     // Adiciona legendas visuais para a Origem do Processo
-    oBrowse:AddLegend("ZZ3_ORIGEM == '1'", "GREEN", "Inclusao Manual (Com Senha)")
-    oBrowse:AddLegend("ZZ3_ORIGEM == '2'", "BLUE" , "Inclusao Automatica (Job/API)")
+    oBrowse:AddLegend("ZZ2_ORIGEM == '1'", "GREEN", "Inclusao Manual (Com Senha)")
+    oBrowse:AddLegend("ZZ2_ORIGEM == '2'", "BLUE" , "Inclusao Automatica (Job/API)")
     
     oBrowse:Activate()
 Return NIL
@@ -29,12 +29,12 @@ Construcao do Modelo de Dados (MVC)
 @return object, modelo
 /*/
 Static Function ModelDef()
-    Local oStruZZ3 := FWFormStruct(1, "ZZ3")
+    Local oStruZZ2 := FWFormStruct(1, "ZZ2")
     Local oModel   := MPFormModel():New("CI04A001M")
     
-    oModel:AddFields("ZZ3MASTER", NIL, oStruZZ3)
-    oModel:SetPrimaryKey({"ZZ3_FILIAL", "ZZ3_DOC", "ZZ3_PRODUT"})
-    oModel:SetDescription("Modelo de Dados - Auditoria ZZ3")
+    oModel:AddFields("ZZ2MASTER", NIL, oStruZZ2)
+    oModel:SetPrimaryKey({"ZZ2_FILIAL", "ZZ2_DOC", "ZZ2_PRODUT"})
+    oModel:SetDescription("Modelo de Dados - Auditoria ZZ2")
     
 Return oModel
 
@@ -48,13 +48,13 @@ Construção do MVC
 /*/
 Static Function ViewDef()
     Local oModel   := FWLoadModel("CI04A001")
-    Local oStruZZ3 := FWFormStruct(2, "ZZ3")
+    Local oStruZZ2 := FWFormStruct(2, "ZZ2")
     Local oView    := FWFormView():New()
     
     oView:SetModel(oModel)
-    oView:AddField("VIEW_ZZ3", oStruZZ3, "ZZ3MASTER")
+    oView:AddField("VIEW_ZZ2", oStruZZ2, "ZZ2MASTER")
     oView:CreateHorizontalBox("TELA", 100)
-    oView:SetOwnerView("VIEW_ZZ3", "TELA")
+    oView:SetOwnerView("VIEW_ZZ2", "TELA")
     
 Return oView
 

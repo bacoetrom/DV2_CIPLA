@@ -111,7 +111,7 @@ User Function CI02A001(aAlteracoes as Array) as Logical
 
     // Validação concluida uma única vez: agora grava um registro de auditoria por campo alterado
     For nI := 1 To Len(aAlteracoes)
-        U_ZTLGravaLog( "CI02A001", "SA2", cChaveForn, aAlteracoes[nI][1], ;
+        U_ZZ1GravaLog( "CI02A001", "SA2", cChaveForn, aAlteracoes[nI][1], ;
             aAlteracoes[nI][2] , ;
             aAlteracoes[nI][3] , ;
             Alltrim(_cJustif) )

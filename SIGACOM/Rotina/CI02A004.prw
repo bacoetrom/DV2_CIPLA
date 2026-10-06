@@ -3,10 +3,10 @@
 #Include "FWMVCDef.ch"
 
 //-------------------------------------------------------------------
-// CI02A004 - Consulta de Log de Auditoria Genérico (tabela ZTL)
+// CI02A004 - Consulta de Log de Auditoria Genérico (tabela ZZ1)
 //
 // Rotina MVC (Model-View-Controller) para VISUALIZAÇÃO dos registros
-// gravados pelo motor genérico de auditoria U_ZTLGravaLog (ZTLU001),
+// gravados pelo motor genérico de auditoria U_ZZ1GravaLog (ZZ1U001),
 // usado hoje pelo Ponto de Entrada A010TOK (MATA010 - Cadastro de
 // Produtos, campo B1_TIPO) e pela função CI02A001 (SA2, campo
 // A2_MSBLQL), podendo ser reaproveitado por qualquer outra rotina.
@@ -18,21 +18,21 @@
 
 /*/{Protheus.doc} CI02A004
 Função principal da rotina. Monta o Browse (lista de registros) da
-tabela ZTL e ativa a tela.
+tabela ZZ1 e ativa a tela.
 /*/
 User Function CI02A004()
 
 	Local oBrowse
 
 	oBrowse := FWMBrowse():New()
-	oBrowse:SetAlias("ZTL")
-	oBrowse:SetDescription("Log de Auditoria (ZTL)")
+	oBrowse:SetAlias("ZZ1")
+	oBrowse:SetDescription("Log de Auditoria (ZZ1)")
 	oBrowse:Activate()
 
 Return
 
 /*/{Protheus.doc} ModelDef
-Define o Model (regras de dados) do log de auditoria genérico ZTL.
+Define o Model (regras de dados) do log de auditoria genérico ZZ1.
 @type function
 @author Pablo Regis
 @since 27/08/2026
@@ -40,15 +40,15 @@ Define o Model (regras de dados) do log de auditoria genérico ZTL.
 /*/
 Static Function ModelDef()
 
-	Local oStruZTL := FWFormStruct(1, "ZTL")
+	Local oStruZZ1 := FWFormStruct(1, "ZZ1")
 	Local oModel
 
 	oModel := MPFormModel():New("CI02A004M")
-	oModel:AddFields("ZTLMASTER", /*cOwner*/, oStruZTL)
-	oModel:SetPrimaryKey({"ZTL_FILIAL", "ZTL_SEQ"})
+	oModel:AddFields("ZZ1MASTER", /*cOwner*/, oStruZZ1)
+	oModel:SetPrimaryKey({"ZZ1_FILIAL", "ZZ1_SEQ"})
 	oModel:SetDescription("Log de Auditoria Genérico")
 
-	oModel:GetModel("ZTLMASTER"):SetDescription("Dados do Evento de Auditoria")
+	oModel:GetModel("ZZ1MASTER"):SetDescription("Dados do Evento de Auditoria")
 
 Return oModel
 
@@ -56,19 +56,19 @@ Return oModel
 /*/{Protheus.doc} ViewDef
 Define a View (layout de tela) usada ao abrir/visualizar um registro
 do log. Aqui é um formulário simples, com todos os campos da tabela
-ZTL dispostos em uma única área (Box) horizontal.
+ZZ1 dispostos em uma única área (Box) horizontal.
 /*/
 Static Function ViewDef()
 
 	Local oModel   := FWLoadModel("CI02A004")
-	Local oStruZTL := FWFormStruct(2, "ZTL")
+	Local oStruZZ1 := FWFormStruct(2, "ZZ1")
 	Local oView
 
 	oView := FWFormView():New()
 	oView:SetModel(oModel)
-	oView:AddField("VIEW_ZTL", oStruZTL, "ZTLMASTER")
+	oView:AddField("VIEW_ZZ1", oStruZZ1, "ZZ1MASTER")
 	oView:CreateHorizontalBox("TELA", 100)
-	oView:SetOwnerView("VIEW_ZTL", "TELA")
+	oView:SetOwnerView("VIEW_ZZ1", "TELA")
 
 Return oView
 
@@ -79,7 +79,7 @@ Define as opções de menu disponíveis no Browse.
 Propositalmente só existe a opção "Visualizar" (OPERATION 2), sem
 Incluir (3), Alterar (4) ou Excluir (5) — já que os registros dessa
 tabela devem ser gravados exclusivamente pelo motor genérico de
-auditoria U_ZTLGravaLog (ZTLU001), e não editados manualmente pelo
+auditoria U_ZZ1GravaLog (ZZ1U001), e não editados manualmente pelo
 usuário.
 /*/
 Static Function MenuDef()

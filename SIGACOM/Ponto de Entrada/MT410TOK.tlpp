@@ -28,10 +28,10 @@ tela de Assinatura Eletronica (senha do proprio usuario logado + Justificativa),
 listando todos os itens alterados de uma so vez; se confirmada, grava um
 registro de auditoria por item alterado, numa unica leva. O fluxo de
 Assinatura Eletronica (tela, validacoes de senha/chave e gravacao do
-registro de auditoria na tabela ZTL via U_ZTLGravaLog()) e delegado a
-classe generica ZTLAssinaEletronica (ver ZTLU002.tlpp), que reaproveita o
+registro de auditoria na tabela ZZ1 via U_ZZ1GravaLog()) e delegado a
+classe generica ZZ1AssinaEletronica (ver ZZ1U002.tlpp), que reaproveita o
 motor generico de auditoria ja usado por A010TOK e CI02A001 (ver
-ZTLU001.tlpp).
+ZZ1U001.tlpp).
 
 Substitui a implementação anterior "WM410LINE", que usava um nome de Ponto
 de Entrada inexistente na rotina MATA410 e por isso nunca era chamada pela
@@ -51,8 +51,8 @@ gravação, ao clicar em Salvar). Não adicionar prefixo U_ na declaração da
 função. Depende das variáveis Private aCols/aHeader e do alias SC5/SC6
 posicionados pela rotina padrão MATA410.
 @see MATA410
-@see ZTLGravaLog
-@see ZTLAssinaEletronica
+@see ZZ1GravaLog
+@see ZZ1AssinaEletronica
 /*/
 User Function MT410TOK() as Logical
 
@@ -297,18 +297,18 @@ login + Chave de autorizacao), listando todos os itens pendentes (todos
 os itens do pedido que tiveram o Lote de Controle alterado), exigindo a
 senha do proprio usuario logado uma unica vez antes de liberar a
 gravacao de todos eles. Quando confirmado, grava um registro de
-auditoria por item pendente (uma linha por item na tabela ZTL) e marca
+auditoria por item pendente (uma linha por item na tabela ZZ1) e marca
 todos como autorizados na sessao corrente (aMT410TKVal), numa unica
 leva. Delega o fluxo completo (tela, validacoes e gravacao do log de
-auditoria na tabela ZTL) para a classe generica ZTLAssinaEletronica
-(ver ZTLU002.tlpp), que reaproveita o mesmo padrao ja usado por este PE
+auditoria na tabela ZZ1) para a classe generica ZZ1AssinaEletronica
+(ver ZZ1U002.tlpp), que reaproveita o mesmo padrao ja usado por este PE
 e por CI02A001.tlpp.
 @type function
 @author Pablo Regis
 @since 15/09/2026
 @param aPendentes, array, "Itens pendentes de confirmacao, cada item {cItem, cLoteAnt, cLoteNovo, cChaveLin}"
 @return logical, .T. se a senha, chave e justificativa foram confirmadas para todos os itens pendentes
-@see ZTLAssinaEletronica
+@see ZZ1AssinaEletronica
 /*/
 Static Function MT410TKAssinaLote(aPendentes as Array) as Logical
 
@@ -319,7 +319,7 @@ Static Function MT410TKAssinaLote(aPendentes as Array) as Logical
 
 	cChavePed := xFilial("SC6") + SC5->C5_NUM
 
-	oAssEle := ZTLAssinaEletronica():New("MT410TOK", "SC6", cChavePed)
+	oAssEle := ZZ1AssinaEletronica():New("MT410TOK", "SC6", cChavePed)
 	oAssEle:SetTitulo("Assinatura Eletronica - Alteracao de Lote de Controle")
 	oAssEle:SetParamChave("FS_MT410TK", "123456")
 
