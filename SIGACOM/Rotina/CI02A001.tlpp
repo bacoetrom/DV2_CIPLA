@@ -1,0 +1,214 @@
+#include "tlpp-core.th"
+#INCLUDE 'rwmake.ch'
+#INCLUDE 'topconn.ch'
+#INCLUDE "TBICONN.CH"
+
+#DEFINE CRLF CHR(13)+CHR(10)
+
+/*/{Protheus.doc} CI02A001
+Validação de senha para confirmar a alteração de um ou mais campos sensíveis do fornecedor
+(ex.: Bloqueio - A2_MSBLQL, Qualificação - A2_XSTATU) e registro da auditoria correspondente.
+@type function
+@version 3.0
+@author Pablo Regis
+@since 23/07/2026
+@param aAlteracoes, array, "Array de alterações de campos sensíveis já detectadas pelo chamador. Cada item é um array {cCampo, cValorAnt, cValorNovo}. Array vazio ou omitido indica que não há alteração a confirmar"
+@return logical, "retorna .T. se não houver alteração a confirmar ou se a senha/chave/justificativa forem validadas com sucesso para TODAS as alterações informadas; ou .F. se a senha/chave/justificativa informadas forem inválidas ou o usuário cancelar a confirmação"
+/*/
+User Function CI02A001(aAlteracoes as Array) as Logical
+
+    Local aArea      := GetArea()                    as Array
+    Local lRet       := .T.                          as Logical
+    Local cCodUsr    := RetCodUsr()                  as Character
+    Local cNomUsr    := Alltrim(UsrRetName(cCodUsr)) as Character
+    Local cChaveForn := ""                           as Character
+    Local cMsgAlt    := ""                           as Character
+    Local nI         := 0                            as Numeric
+    Local _cChaveOk  := SuperGetMv("FS_CI02A001", .F., "123456") as Character
+    Local _aArray    := {}                           as Array
+    Local _lVl       := .F.                          as Logical
+
+    Private _oTela       := Nil          as Object
+    Private _lOp         := .F.          as Logical
+    Private _cSenha      := Space(40)    as Character
+    Private _cChave      := Space(40)    as Character
+    Private _cJustif     := Space(200)   as Character
+    Private _cListaAlt   := Space(200)   as Character
+
+    Default aAlteracoes := {}
+
+    // Sem alteração de campo sensível a confirmar, ou fora de uma edição de registro
+    // já existente (não se aplica a inclusão): nada a fazer
+    If !ALTERA .Or. Len(aAlteracoes) == 0
+        RestArea(aArea)
+        Return lRet
+    EndIf
+
+    ProcLogIni({}, "CI02A001")
+    ProcLogAtu("INICIO")
+
+    cMsgAlt := ""
+    For nI := 1 To Len(aAlteracoes)
+        cMsgAlt += fTituloCampo(aAlteracoes[nI][1]) + " (" + aAlteracoes[nI][1] + "): " + ;
+            fDescValor(aAlteracoes[nI][1], aAlteracoes[nI][2]) + " -> " + ;
+            fDescValor(aAlteracoes[nI][1], aAlteracoes[nI][3]) + CRLF
+    Next nI
+
+    _cListaAlt := cMsgAlt
+
+    ProcLogAtu("MENSAGEM","INFO","Tentativa de alteração de campos sensíveis do Fornecedor "+CRLF+;
+            "Fornecedor: " + Alltrim(SA2->A2_COD) + "/" + Alltrim(SA2->A2_LOJA) + CRLF + ;
+            cMsgAlt + ;
+            "Data/Hora: " + DtoC(Date()) + " " + Time() + CRLF +;
+            "Usuário Logado: " + cNomUsr;
+            )
+
+    // Solicita justificativa, senha e chave do usuário logado UMA ÚNICA VEZ,
+    // cobrindo todas as alterações de campos sensíveis desta edição
+    @ 00,0 TO 470,350 DIALOG _oTela TITLE "Confirmação de Alteração de Dados do Fornecedor"
+        @ 08,02 SAY "Fornecedor: "
+        @ 08,35 SAY Alltrim(SA2->A2_COD) + "/" + Alltrim(SA2->A2_LOJA) + " - " + Alltrim(SA2->A2_NOME)
+        @ 18,02 SAY "Alterações (campo: valor atual -> valor novo):"
+        @ 24,02 GET _cListaAlt MEMO SIZE 150,40 WHEN .F.
+        @ 90,02 SAY "Justificativa da alteração (obrigatória):"
+        @ 100,02 GET _cJustif MEMO SIZE 150,50
+        @ 175,02 SAY "Redigite sua senha de login (" + cNomUsr + ") para confirmar:"
+        @ 185,02 SAY "Senha: "
+        @ 185,45 GET _cSenha PICTURE "@S40" VALID .T. PASSWORD Object oSenha
+        @ 200,02 SAY "Chave: "
+        @ 200,45 GET _cChave PICTURE "@S40" VALID .T. PASSWORD Object oChave
+        @ 220,060 BMPBUTTON TYPE 1 ACTION fConfirmaCICO()
+        @ 220,090 BUTTON "Auditoria" SIZE 35,11 ACTION PROCLOGVIEW()
+    ACTIVATE DIALOG _oTela CENTERED
+
+    If !_lOp
+        MsgStop("Operação cancelada pelo usuário. Os campos alterados não serão gravados.", "Cancelamento")
+        ProcLogAtu("MENSAGEM","FALHA","Operação cancelada pelo usuário. Alterações não efetivadas.")
+        ProcLogAtu("FIM")
+        RestArea(aArea)
+        Return .F.
+    EndIf
+
+    PswOrder(2)
+    If PswSeek(cNomUsr, .T.)
+        _aArray := PswRet()
+        If Alltrim(_aArray[1][3]) == Alltrim(_cSenha) .And. _cChaveOk == Alltrim(_cChave)
+            _lVl := .T.
+        ElseIf PSWNAME(Alltrim(_cSenha)) .And. _cChaveOk == Alltrim(_cChave)
+            _lVl := .T.
+        EndIf
+    EndIf
+
+    If !_lVl
+        MsgStop("Senha ou Chave incorreta. Os campos alterados não serão gravados.", "Autenticação")
+        ProcLogAtu("MENSAGEM","FALHA","Senha ou Chave incorreta informada pelo usuário " + cNomUsr + ". Alterações não efetivadas.")
+        ProcLogAtu("FIM")
+        RestArea(aArea)
+        Return .F.
+    EndIf
+
+    cChaveForn := SA2->A2_FILIAL + SA2->A2_COD + SA2->A2_LOJA
+
+    // Validação concluida uma única vez: agora grava um registro de auditoria por campo alterado
+    For nI := 1 To Len(aAlteracoes)
+        U_ZTLGravaLog( "CI02A001", "SA2", cChaveForn, aAlteracoes[nI][1], ;
+            aAlteracoes[nI][2] , ;
+            aAlteracoes[nI][3] , ;
+            Alltrim(_cJustif) )
+    Next nI
+
+    MsgInfo("Senha validada com sucesso. Alterações confirmadas.", "Autenticação")
+    ProcLogAtu("MENSAGEM","SUCESSO","Senha validada. Alterações efetivadas: " + CRLF + cMsgAlt)
+    ProcLogAtu("FIM")
+
+    RestArea(aArea)
+
+Return lRet
+
+/*/{Protheus.doc} fConfirmaCICO
+Valida a obrigatoriedade da justificativa antes de permitir o
+fechamento do dialog de confirmação de alteração de campos sensíveis do fornecedor.
+@type function
+@author Pablo Regis
+@since 27/08/2026
+@return logical, ".T. se a justificativa foi informada e o dialog foi fechado"
+/*/
+Static Function fConfirmaCICO() as Logical
+
+    If Empty(AllTrim(_cJustif))
+        MsgAlert("Informe a justificativa da alteração antes de confirmar.", "Atenção")
+        Return .F.
+    EndIf
+
+    _lOp := .T.
+    Close(_oTela)
+
+Return .T.
+
+/*/{Protheus.doc} fTituloCampo
+Retorna o título do campo diretamente do dicionário de dados (SX3), pelo nome do campo,
+sem mapeamento fixo no código. Usado nas mensagens de tela e de log do CI02A001.
+@type function
+@author Pablo Regis
+@since 10/09/2026
+@param cCampo, character, "Nome do campo (ex.: 'A2_MSBLQL', 'A2_XSTATU')"
+@return character, "Título do campo (X3_TITULO do SX3); quando o campo não é encontrado no dicionário, retorna o próprio nome do campo"
+/*/
+Static Function fTituloCampo(cCampo as Character) as Character
+
+    Local cAliasAnt := Alias()          as Character
+    Local cTitulo   := Alltrim(cCampo)  as Character
+
+    dbSelectArea("SX3")
+    dbSetOrder(2)
+    If dbSeek(Alltrim(cCampo))
+        cTitulo := Alltrim(X3Titulo())
+    EndIf
+
+    If !Empty(cAliasAnt)
+        dbSelectArea(cAliasAnt)
+    EndIf
+
+Return cTitulo
+
+/*/{Protheus.doc} fDescValor
+Retorna a descrição do valor de um campo diretamente do dicionário de dados (SX3),
+a partir da Lista de Opções do campo (X3_CBOX), via X3Combo(). Quando o campo não possui
+combo configurado no dicionário ou o valor não consta na lista, retorna o próprio valor bruto.
+@type function
+@author Pablo Regis
+@since 10/09/2026
+@param cCampo, character, "Nome do campo"
+@param cValor, character, "Conteúdo do campo"
+@return character, "Descrição do valor conforme X3_CBOX do campo, ou o próprio valor bruto quando não há combo/descrição"
+/*/
+Static Function fDescValor(cCampo as Character, cValor )  as Character
+
+    Local cDesc := " " as Character
+
+    
+    If ValType(cValor) == "C" 
+        cDesc := Alltrim(X3Combo(cCampo, cValor)) 
+        
+        If Empty(cDesc)
+            cDesc := Alltrim(cValor)
+        EndIf
+    Else
+        If ValType(cValor) == "U"
+            cDesc := ""
+        ElseIf ValType(cValor) == "N"
+            cDesc := AllTrim(Str(cValor))
+        ElseIf ValType(cValor) == "D"
+            cDesc := DToC(cValor)
+        ElseIf ValType(cValor) == "L"
+            If cValor
+                cDesc := "Sim"
+            Else
+                cDesc := "Não"
+            EndIf
+        Else
+            cDesc := cValToChar(cValor)   
+        EndIf    
+    EndIf
+
+Return cDesc

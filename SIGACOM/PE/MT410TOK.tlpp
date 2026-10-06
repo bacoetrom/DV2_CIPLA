@@ -1,0 +1,391 @@
+#include "tlpp-core.th"
+#include "totvs.ch"
+
+// Chaves (pedido|item|armazém destino) já autorizadas nesta sessão de edição,
+// para não repetir o prompt de senha/justificativa a cada novo clique em
+// Salvar enquanto o usuário não alterar novamente o valor da mesma linha.
+Static aMT410TKVal := {} as Array
+
+/*/{Protheus.doc} MT410TOK
+Ponto de entrada real e documentado da rotina MATA410 (Pedido de Venda),
+disparado pela rotina padrão ao confirmar a operação (botão Salvar) de
+Inclusão, Alteração, Exclusão ou Cópia do pedido à sintaxe oficial
+MT410TOK([nOpc], [aRecnoSE1RA]).
+
+Ao confirmar o pedido, percorre todas as linhas de aCols e identifica
+todos os itens que ja existiam fisicamente gravados em SC6 e tiveram o
+Lote de Controle (C6_LOTECTL) alterado. Uma linha nova (sem registro
+fisico anterior em SC6) nunca exige justificativa. Dentre os itens com
+Lote alterado, aplica a regra FEFO (First Expire, First Out): consulta o
+saldo em lote (SB8) do produto/armazem (C6_PRODUTO/C6_LOCAL) e so
+considera o item pendente de Assinatura Eletronica quando o novo Lote de
+Controle (C6_DTVALID) tiver vencimento posterior ao menor vencimento
+disponivel em SB8 para aquele produto/armazem; a troca para o lote de
+menor vencimento (ou de vencimento igual/anterior) e liberada sem
+solicitar senha (ver MT410TKMenorVenc). Somente ao final do
+laco, com todos os itens alterados ja identificados, e exibida uma UNICA
+tela de Assinatura Eletronica (senha do proprio usuario logado + Justificativa),
+listando todos os itens alterados de uma so vez; se confirmada, grava um
+registro de auditoria por item alterado, numa unica leva. O fluxo de
+Assinatura Eletronica (tela, validacoes de senha/chave e gravacao do
+registro de auditoria na tabela ZTL via U_ZTLGravaLog()) e delegado a
+classe generica ZTLAssinaEletronica (ver ZTLU002.tlpp), que reaproveita o
+motor generico de auditoria ja usado por A010TOK e CI02A001 (ver
+ZTLU001.tlpp).
+
+Substitui a implementação anterior "WM410LINE", que usava um nome de Ponto
+de Entrada inexistente na rotina MATA410 e por isso nunca era chamada pela
+rotina padrão.
+
+PARAMIXB:
+  [1] nOpc         - Numeric - Código da operação confirmada
+  [2] aRecnoSE1RA  - Array   - Recnos de SE1/RA relacionados (não utilizado
+                      nesta implementação)
+
+@type user function
+@author Pablo Regis
+@since 15/09/2026
+@return Logical, .T. permite a conclusão da operação / .F. não permite
+@obs Não executado dentro de Begin/End Transaction (dispara antes da
+gravação, ao clicar em Salvar). Não adicionar prefixo U_ na declaração da
+função. Depende das variáveis Private aCols/aHeader e do alias SC5/SC6
+posicionados pela rotina padrão MATA410.
+@see MATA410
+@see ZTLGravaLog
+@see ZTLAssinaEletronica
+/*/
+User Function MT410TOK() as Logical
+
+	Local nOpc  := 0  as Numeric
+	Local lRet  := .T. as Logical
+
+	If Type("PARAMIXB") == "A" .And. Len(PARAMIXB) >= 1 .And. ValType(PARAMIXB[1]) == "N"
+		nOpc := PARAMIXB[1]
+	EndIf
+
+	// Operacao de exclusao do pedido nao exige validacao de Lote de Controle.
+	If nOpc == 5
+		Return .T.
+	EndIf
+
+	Try
+		lRet := MT410TKVldGrid()
+	Catch oError
+		// Não mascarar a falha: se o erro for engolido e lRet forcado para
+		// .T., a gravação do log de auditoria (um registro por item pendente,
+		// em MT410TKAssinaLote/GravaLog) pode ter sido interrompida no meio,
+		// deixando itens sem log e o usuário sem nenhum aviso.
+		FWLogMsg("ERROR", , "MT410TOK", "MT410TOK", , "01", oError:Description, 0, 0, {})
+		MsgStop("Falha ao validar a alteracao de Lote de Controle: " + oError:Description + CHR(13) + "As alteracoes nao serao gravadas.", "MT410TOK")
+		lRet := .F.
+	EndTry
+
+Return lRet
+
+/*/{Protheus.doc} MT410TKVldGrid
+Percorre todas as linhas não deletadas de aCols e acumula, em
+aPendentes, todos os itens que tenham sido efetivamente alterados em
+relacao ao valor fisico gravado em SC6 (Lote de Controle) E que violem a
+regra FEFO (novo vencimento posterior ao menor vencimento disponivel em
+SB8 para o produto - ver MT410TKAcumLinha/MT410TKMenorVenc). Ao final do
+laco, se houver ao menos um item pendente, aciona uma UNICA validacao de
+Assinatura Eletronica (senha + justificativa) cobrindo todos eles de
+uma so vez.
+@type static function
+@author Pablo Regis
+@since 15/09/2026
+@return logical, .T. se não havia pendência ou se a Assinatura Eletrônica
+foi confirmada para todos os itens pendentes; .F. se foi cancelada ou os
+dados informados foram inválidos (bloqueia a gravação do pedido inteiro)
+/*/
+Static Function MT410TKVldGrid() as Logical
+
+	Local nPosLote    := 0  as Numeric
+	Local nPosItem    := 0  as Numeric
+	Local nPosProduto := 0  as Numeric
+	Local nPosDtValid := 0  as Numeric
+	Local nPosLocal   := 0  as Numeric
+	Local nI          := 0  as Numeric
+	Local aPendentes  := {} as Array
+	Local lRet        := .T. as Logical
+
+	If ValType(aCols) <> "A" .Or. ValType(aHeader) <> "A"
+		Return .T.
+	EndIf
+
+	nPosLote    := aScan(aHeader, {|aCampo| AllTrim(aCampo[2]) == "C6_LOTECTL"})
+	nPosItem    := aScan(aHeader, {|aCampo| AllTrim(aCampo[2]) == "C6_ITEM"})
+	nPosProduto := aScan(aHeader, {|aCampo| AllTrim(aCampo[2]) == "C6_PRODUTO"})
+	nPosDtValid := aScan(aHeader, {|aCampo| AllTrim(aCampo[2]) == "C6_DTVALID"})
+	nPosLocal   := aScan(aHeader, {|aCampo| AllTrim(aCampo[2]) == "C6_LOCAL"})
+
+	If nPosLote == 0 .Or. nPosItem == 0
+		Return .T.
+	EndIf
+
+	For nI := 1 To Len(aCols)
+
+		// Última posição de aCols[nI] indica se a linha foi marcada para
+		// deleção (padrão MSGetDados): .T. = linha deletada na grid.
+		If aCols[nI][Len(aCols[nI])] == .T.
+			Loop
+		EndIf
+
+		MT410TKAcumLinha(nI, nPosLote, nPosItem, nPosProduto, nPosDtValid, nPosLocal, aPendentes)
+
+	Next nI
+
+	If Len(aPendentes) > 0
+		lRet := MT410TKAssinaLote(aPendentes)
+	EndIf
+
+Return lRet
+
+/*/{Protheus.doc} MT410TKAcumLinha
+Avalia uma linha especifica da grid e, quando o Lote de Controle foi
+efetivamente alterado em relacao ao valor gravado em SC6, ainda nao foi
+autorizado nesta sessao de edicao (aMT410TKVal) E a alteracao viola a
+regra FEFO (novo vencimento - C6_DTVALID - posterior ao menor
+vencimento disponivel em SB8 para o produto do item, ver
+MT410TKMenorVenc), acumula a alteracao em aPendentes para validacao
+unica de Assinatura Eletronica ao final do laco (ver
+MT410TKVldGrid/MT410TKAssinaLote). Quando o novo lote e o de menor
+vencimento disponivel (ou de vencimento igual/anterior), a troca e
+liberada sem exigir senha. Nao exibe nenhuma tela.
+@type function
+@author Pablo Regis
+@since 15/09/2026
+@param nLinha, numeric, Numero da linha corrente de aCols
+@param nPosLote, numeric, Posicao de C6_LOTECTL em aHeader/aCols
+@param nPosItem, numeric, Posicao de C6_ITEM em aHeader/aCols
+@param nPosProduto, numeric, "Posicao de C6_PRODUTO em aHeader/aCols (0 se nao encontrado)"
+@param nPosDtValid, numeric, "Posicao de C6_DTVALID em aHeader/aCols (0 se nao encontrado)"
+@param nPosLocal, numeric, "Posicao de C6_LOCAL em aHeader/aCols (0 se nao encontrado)"
+@param aPendentes, array, "Acumulador (passado por referencia); cada item adicionado no formato {cItem, cLoteAnt, cLoteNovo, cChaveLin}"
+@return logical, .T. se a linha foi acumulada em aPendentes, .F. caso contrario (linha nova, sem alteracao efetiva, alteracao respeitando o FEFO, ou ja autorizada nesta sessao)
+/*/
+Static Function MT410TKAcumLinha(nLinha as Numeric, nPosLote as Numeric, nPosItem as Numeric, nPosProduto as Numeric, nPosDtValid as Numeric, nPosLocal as Numeric, aPendentes as Array) as Logical
+
+	Local cItemLin     := ""       as Character
+	Local cLoteAnt     := ""       as Character
+	Local cLoteNovo    := ""       as Character
+	Local cChaveLin    := ""       as Character
+	Local cProduto     := ""       as Character
+	Local cLocal       := ""       as Character
+	Local dDtValidNovo := CTOD("") as Date
+	Local dMenorVenc   := CTOD("") as Date
+
+	cItemLin  := AllTrim(aCols[nLinha][nPosItem])
+	cLoteNovo := AllTrim(aCols[nLinha][nPosLote])
+
+	If Empty(cItemLin) .Or. Empty(cLoteNovo)
+		Return .F.
+	EndIf
+
+	cLoteAnt := MT410TKLoteGrv(cItemLin)
+
+	// Sem valor anterior gravado (linha nova) ou sem alteracao efetiva:
+	// nao exige assinatura eletronica.
+	If  cLoteNovo == cLoteAnt
+		Return .F.
+	EndIf
+
+	// Regra FEFO: se for possivel apurar o produto/vencimento/armazem do
+	// novo lote e existir saldo em SB8 para comparação, e o novo
+	// vencimento nao for posterior ao menor vencimento disponível no
+	// mesmo armazem, libera a troca sem senha. Quando nao for possivel
+	// apurar (campo ausente na grid ou sem saldo em SB8 para o produto),
+	// mantém o comportamento conservador anterior (exige assinatura
+	// eletronica).
+	If nPosProduto > 0 .And. nPosDtValid > 0
+		cProduto := AllTrim(aCols[nLinha][nPosProduto])
+		If ValType(aCols[nLinha][nPosDtValid]) == "D"
+			dDtValidNovo := aCols[nLinha][nPosDtValid]
+		EndIf
+		If nPosLocal > 0
+			cLocal := AllTrim(aCols[nLinha][nPosLocal])
+		EndIf
+	EndIf
+
+	If !Empty(cProduto) .And. !Empty(dDtValidNovo) .And. !Empty(cLocal)
+		dMenorVenc := MT410TKMenorVenc(cProduto, cLocal)
+		If !Empty(dMenorVenc) .And. dDtValidNovo <= dMenorVenc
+			Return .F.
+		EndIf
+	EndIf
+
+	cChaveLin := MT410TKChaveLin(cItemLin, cLoteNovo)
+
+	// Já autorizado nesta sessão de edição para este item, com este mesmo
+	// valor de destino: não acumula de novo nem repete o prompt.
+	If AScan(aMT410TKVal, {|c| c == cChaveLin}) > 0
+		Return .F.
+	EndIf
+
+	aAdd(aPendentes, {cItemLin, cLoteAnt, cLoteNovo, cChaveLin,dMenorVenc,dDtValidNovo})
+
+Return .T.
+
+/*/{Protheus.doc} MT410TKLoteGrv
+Retorna o valor de C6_LOTECTL efetivamente gravado no banco (SC6) para o
+item informado do pedido corrente (posicionado em SC5). Assume que SC5
+esta posicionado no pedido em edicao (mesmo padrao ja adotado na
+implementacao anterior deste ponto de entrada). Se o item ainda nao
+existir fisicamente (linha nova), retorna vazio.
+@type function
+@author Pablo Regis
+@since 15/09/2026
+@param cItem, character, Numero do item (C6_ITEM) sendo validado
+@return character, valor gravado de C6_LOTECTL, ou vazio se e uma linha nova
+/*/
+Static Function MT410TKLoteGrv(cItem as Character) as Character
+
+	Local cLoteGrv  := "" as Character
+	Local cAliasAnt := "" as Character
+	Local nOrdAnt   := 0  as Numeric
+
+	If Select("SC6") == 0 .Or. Select("SC5") == 0
+		Return ""
+	EndIf
+
+	cAliasAnt := SC6->(GetArea())
+	nOrdAnt   := SC6->(IndexOrd())
+
+	SC6->(DbSetOrder(1))
+	If SC6->(DbSeek(xFilial("SC6") + SC5->C5_NUM + cItem))
+		If !Empty(SC6->C6_LOTECTL)
+			cLoteGrv := AllTrim(SC6->C6_LOTECTL)
+		EndIf
+	EndIf
+
+	SC6->(RestArea(cAliasAnt))
+
+	// RestArea() restaura apenas Recno/Filtro, não a ordem de índice ativa.
+	// Sem isto, o SC6 permanece na ordem 1 após esta validação, o que pode
+	// interferir na forma como a rotina padrão MATA410 localiza/grava os
+	// demais itens do grid após este Ponto de Entrada retornar.
+	If nOrdAnt > 0
+		SC6->(DbSetOrder(nOrdAnt))
+	EndIf
+
+Return cLoteGrv
+
+/*/{Protheus.doc} MT410TKChaveLin
+Monta a chave de controle (pedido + item + valor de destino) usada para
+identificar, dentro da sessao corrente, se a alteracao do Lote de
+Controle daquele item ja foi autorizada com aquele valor especifico.
+@type function
+@author Pablo Regis
+@since 15/09/2026
+@param cItem, character, Numero do item (C6_ITEM)
+@param cLoteNovo, character, Valor de destino do Lote de Controle
+@return character, chave de controle no formato "<C5_NUM>|<item>|<C6_LOTECTL>"
+/*/
+Static Function MT410TKChaveLin(cItem as Character, cLoteNovo as Character) as Character
+
+	Local cNumPed := "" as Character
+
+	If Select("SC5") > 0
+		cNumPed := AllTrim(SC5->C5_NUM)
+	EndIf
+
+Return cNumPed + "|" + cItem + "|" + cLoteNovo
+
+/*/{Protheus.doc} MT410TKAssinaLote
+Exibe uma UNICA tela de Assinatura Eletronica (Justificativa + Senha de
+login + Chave de autorizacao), listando todos os itens pendentes (todos
+os itens do pedido que tiveram o Lote de Controle alterado), exigindo a
+senha do proprio usuario logado uma unica vez antes de liberar a
+gravacao de todos eles. Quando confirmado, grava um registro de
+auditoria por item pendente (uma linha por item na tabela ZTL) e marca
+todos como autorizados na sessao corrente (aMT410TKVal), numa unica
+leva. Delega o fluxo completo (tela, validacoes e gravacao do log de
+auditoria na tabela ZTL) para a classe generica ZTLAssinaEletronica
+(ver ZTLU002.tlpp), que reaproveita o mesmo padrao ja usado por este PE
+e por CI02A001.tlpp.
+@type function
+@author Pablo Regis
+@since 15/09/2026
+@param aPendentes, array, "Itens pendentes de confirmacao, cada item {cItem, cLoteAnt, cLoteNovo, cChaveLin}"
+@return logical, .T. se a senha, chave e justificativa foram confirmadas para todos os itens pendentes
+@see ZTLAssinaEletronica
+/*/
+Static Function MT410TKAssinaLote(aPendentes as Array) as Logical
+
+	Local oAssEle   := Nil as Object
+	Local nI        := 0   as Numeric
+	Local cChavePed := ""  as Character
+	Local lRet      := .F. as Logical
+
+	cChavePed := xFilial("SC6") + SC5->C5_NUM
+
+	oAssEle := ZTLAssinaEletronica():New("MT410TOK", "SC6", cChavePed)
+	oAssEle:SetTitulo("Assinatura Eletronica - Alteracao de Lote de Controle")
+	oAssEle:SetParamChave("FS_MT410TK", "123456")
+
+	For nI := 1 To Len(aPendentes)
+		oAssEle:AddAlteracao("C6_LOTECTL", aPendentes[nI][2], aPendentes[nI][3], ;
+			"Item " + aPendentes[nI][1], xFilial("SC6") + SC5->C5_NUM + aPendentes[nI][1])
+		oAssEle:AddAlteracao("C6_DTVALID", aPendentes[nI][5], aPendentes[nI][6], ;
+			"Item " + aPendentes[nI][1], xFilial("SC6") + SC5->C5_NUM + aPendentes[nI][1])			
+	Next nI
+
+	lRet := oAssEle:Confirma()
+
+	If lRet
+		For nI := 1 To Len(aPendentes)
+			aAdd(aMT410TKVal, aPendentes[nI][4])
+		Next nI
+	EndIf
+
+Return lRet
+
+/*/{Protheus.doc} MT410TKMenorVenc
+Consulta o saldo em lote (SB8) do produto/armazem informados e retorna
+a menor Data de Validade (B8_DTVALID) entre os lotes ja validos na data
+base (B8_DATA <= dDataBase) e nao deletados (D_E_L_E_T_ = ' '), usada
+como referencia para a regra FEFO (First Expire, First Out) na troca de
+Lote de Controle (C6_LOTECTL) do pedido de venda.
+@type function
+@author Pablo Regis
+@since 17/09/2026
+@param cProduto, character, Codigo do produto (C6_PRODUTO) sendo validado
+@param cLocal, character, Armazem (C6_LOCAL) do item sendo validado
+@return date, "menor B8_DTVALID disponivel para o produto/armazem na filial corrente, ou data vazia (CTOD('')) se nao houver nenhum lote disponivel"
+/*/
+Static Function MT410TKMenorVenc(cProduto as Character, cLocal as Character) as Date
+
+	Local cQuery     := ""  as Character
+	Local cAliasQry  := ""  as Character
+	Local oQry       := Nil as Object
+	Local dMenorVenc := CTOD("") as Date
+
+	If Empty(cProduto) .Or. Empty(cLocal)
+		Return dMenorVenc
+	EndIf
+
+	cQuery := "SELECT B8.B8_DTVALID "
+	cQuery +=   "FROM " + RetSqlName("SB8") + " B8 "
+	cQuery +=  "WHERE B8.B8_FILIAL = ? "
+	cQuery +=    "AND B8.B8_PRODUTO = ? "
+	cQuery +=    "AND B8.B8_LOCAL = ? "
+	cQuery +=    "AND B8.B8_DATA <= ? "
+	cQuery +=    "AND B8.D_E_L_E_T_ = ? "
+	cQuery += "ORDER BY B8.B8_DTVALID ASC"
+
+	oQry := FWExecStatement():New(ChangeQuery(cQuery))
+	oQry:SetString(1, xFilial("SB8"))
+	oQry:SetString(2, cProduto)
+	oQry:SetString(3, cLocal)
+	oQry:SetString(4, DTOS(dDataBase))
+	oQry:SetString(5, " ")
+
+	cAliasQry := oQry:OpenAlias()
+
+	If !(cAliasQry)->(Eof())
+		dMenorVenc := stod((cAliasQry)->B8_DTVALID)
+	EndIf
+
+	(cAliasQry)->(DbCloseArea())
+
+Return dMenorVenc
