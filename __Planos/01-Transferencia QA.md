@@ -4,7 +4,7 @@
 **Objetivo:** exigir Assinatura Eletrônica (Justificativa + Senha) ao final da Liberação/Rejeição do CQ (MATA175), no mesmo padrão já implementado no `SIGAEST/Ponto de Entrada/A261TOK.prw` (Transferência Modelo II — MATA261), com auditoria na tabela ZZ2.
 **Autor:** Pablo Regis
 **Data:** 08/10/2026
-**Status:** Planejamento — aguardando decisões em aberto
+**Status:** Implementado — aguardando compilação e testes (seção 5)
 
 ---
 
@@ -84,8 +84,10 @@ com `SetPosicoesGrid(1, 2, 3, 4)`.
 
 ---
 
-## 6. Decisões em aberto
+## 6. Decisões (definidas em 08/10/2026)
 
-1. **Estorno:** o MT175ATU também é executado em *Estornar* (`A175Estorna`). O estorno também deve exigir justificativa, ou o PE deve retornar `.T.` direto quando `lEstorno`?
-2. **Tipo do movimento:** a ZZ2 não possui campo que diferencie Liberação (1) de Rejeição (2). Opções: criar campo (ex.: `ZZ2_TIPO`), concatenar o tipo na justificativa, ou não registrar.
-3. **Escopo:** a regra vale para toda Liberação/Rejeição do CQ ou apenas para algum tipo específico?
+1. **Estorno:** também exige Assinatura Eletrônica e grava ZZ2 (prefixo `ESTORNO LIBERACAO` / `ESTORNO REJEICAO`).
+2. **Tipo do movimento:** gravado como prefixo da justificativa (`[LIBERACAO] ...`, `[REJEICAO] ...`), sem alteração de dicionário. Como um mesmo documento pode ter linhas de liberação e de rejeição, o prefixo é aplicado **por item**: a classe `ZZ2AssinaEletronica` recebeu o método opcional `SetPosicaoTipo(nPosTipo)` (padrão `0` = sem prefixo, comportamento do A261TOK inalterado).
+3. **Escopo:** vale para toda Liberação/Rejeição do CQ.
+
+**Consequência no pacote:** sem campo novo na ZZ2, o `Diferencial/manifest_update.txt` (dicionário) **não** precisa ser alterado. Compilar `MT175ATU.prw` e `CI04A003.tlpp`.

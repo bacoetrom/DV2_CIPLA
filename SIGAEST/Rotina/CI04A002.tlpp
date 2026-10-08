@@ -43,7 +43,7 @@ User Function ZZ2GravaLog(cRotina, cDocNum, cProduto, nQuant, cArmOri, cArmDes, 
 
     Catch oError
         RollbackSX8()
-        FWLogMsg("ERROR", , "ZZ1GravaLog", cRotina, , "01", oError:Description, 0, 0, {})
+        FWLogMsg("ERROR", , "ZZ2GravaLog", cRotina, , "01", oError:Description, 0, 0, {})
         lRet := .F.
     EndTry
 

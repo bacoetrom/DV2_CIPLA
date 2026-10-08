@@ -30,11 +30,13 @@ Class ZZ2AssinaEletronica
     Private Data nPosQuant      as Numeric
     Private Data nPosArmOri     as Numeric
     Private Data nPosArmDes     as Numeric
+    Private Data nPosTipo       as Numeric
     Private Data cJustificativa as Character
 
     Public Method New(cRotina as Character, cDocNum as Character, cOrigem as Character) as Object
     Public Method SetTitulo(cTitulo as Character) as Object
     Public Method SetPosicoesGrid(nPosProduto as Numeric, nPosQuant as Numeric, nPosArmOri as Numeric, nPosArmDes as Numeric) as Object
+    Public Method SetPosicaoTipo(nPosTipo as Numeric) as Object
     Public Method SetItens(aItens as Array) as Object
     Public Method Confirma() as Logical
     Public Method GravaAutomatico(cJustificativa as Character) as Logical
@@ -76,6 +78,7 @@ Method New(cRotina as Character, cDocNum as Character, cOrigem as Character) as 
     ::nPosQuant      := 16
     ::nPosArmOri     := 4
     ::nPosArmDes     := 9
+    ::nPosTipo       := 0
     ::cJustificativa := ""
 
 Return Self
@@ -115,6 +118,24 @@ Method SetPosicoesGrid(nPosProduto as Numeric, nPosQuant as Numeric, nPosArmOri 
     ::nPosQuant   := nPosQuant
     ::nPosArmOri  := nPosArmOri
     ::nPosArmDes  := nPosArmDes
+
+Return Self
+
+/*/{Protheus.doc} SetPosicaoTipo
+Define (opcional) o indice, dentro de cada linha de aItens, da descricao
+do tipo de movimento do item (ex.: LIBERACAO, REJEICAO). Quando informado
+(maior que zero), a justificativa gravada na ZZ2 para o item recebe o
+prefixo "[<tipo>] ", permitindo diferenciar o movimento sem alterar o
+dicionario. Quando nao chamado (padrao 0), nada muda (ex.: MATA261).
+@type method
+@author Pablo Regis
+@since 08/10/2026
+@param nPosTipo, numeric, "Indice da descricao do tipo de movimento em aItens[n] (0 = nao usa)"
+@return object, "instancia da classe (permite chamadas encadeadas)"
+/*/
+Method SetPosicaoTipo(nPosTipo as Numeric) as Object Class ZZ2AssinaEletronica
+
+    ::nPosTipo := nPosTipo
 
 Return Self
 
@@ -258,6 +279,9 @@ Method MontaMsgItens() as Character Class ZZ2AssinaEletronica
     Local nI   := 0  as Numeric
 
     For nI := 1 To Len(::aItens)
+        If ::nPosTipo > 0
+            cMsg += "Tipo: " + AllTrim(::aItens[nI][::nPosTipo]) + " | "
+        EndIf
         cMsg += "Produto: " + AllTrim(::aItens[nI][::nPosProduto]) + ;
             " | Qtde: " + AllTrim(Str(::aItens[nI][::nPosQuant])) + ;
             " | Armazem Origem: " + AllTrim(::aItens[nI][::nPosArmOri]) + ;
@@ -357,6 +381,7 @@ Method GravaLog() as Logical Class ZZ2AssinaEletronica
     Local nQuant   := 0   as Numeric
     Local cArmOri  := ""  as Character
     Local cArmDes  := ""  as Character
+    Local cJustif  := ""  as Character
 
     For nI := 1 To Len(::aItens)
 
@@ -364,8 +389,13 @@ Method GravaLog() as Logical Class ZZ2AssinaEletronica
         nQuant   := ::aItens[nI][::nPosQuant]
         cArmOri  := AllTrim(::aItens[nI][::nPosArmOri])
         cArmDes  := AllTrim(::aItens[nI][::nPosArmDes])
+        cJustif  := ::cJustificativa
 
-        If !U_ZZ2GravaLog(::cRotina, ::cDocNum, cProduto, nQuant, cArmOri, cArmDes, ::cJustificativa, ::cOrigem)
+        If ::nPosTipo > 0
+            cJustif := "[" + AllTrim(::aItens[nI][::nPosTipo]) + "] " + ::cJustificativa
+        EndIf
+
+        If !U_ZZ2GravaLog(::cRotina, ::cDocNum, cProduto, nQuant, cArmOri, cArmDes, cJustif, ::cOrigem)
             lRet := .F.
         EndIf
 
