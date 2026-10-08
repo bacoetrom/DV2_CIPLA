@@ -1,0 +1,197 @@
+MANIFESTO DE ATUALIZAÇÃO
+
+Data : 06/10/2026
+Hora : 13:59:26
+Arquivo de atualização diferencial baseado em projeto gerado pelo Configurador
+Projeto : 000001
+Descrição : CIPLA                                             
+Versão : 0002
+Release de referência : 12.1.2510 
+Responsável pelo Projeto: 000000 - Administrador
+Geração do Pacote: 000000 - Administrador
+-----------------------------
+Componentes do arquivo de atualização :
+
+------------
+SIX
+
+Operação:Inclusão ou Alteração
+Tabela : ZZ1
+Ordem : 1
+
+Operação:Inclusão ou Alteração
+Tabela : ZZ1
+Ordem : 2
+
+Operação:Inclusão ou Alteração
+Tabela : ZZ1
+Ordem : 3
+
+Operação:Inclusão ou Alteração
+Tabela : ZZ2
+Ordem : 1
+
+
+------------
+SX2
+
+Operação:Inclusão ou Alteração
+Tabela : ZZ1
+
+Operação:Inclusão ou Alteração
+Tabela : ZZ2
+
+
+------------
+SX3
+
+Operação:Inclusão ou Alteração
+Campo : ZTL_FILIAL
+
+Operação:Inclusão ou Alteração
+Campo : ZTL_SEQ   
+
+Operação:Inclusão ou Alteração
+Campo : ZTL_ROTINA
+
+Operação:Inclusão ou Alteração
+Campo : ZTL_TABELA
+
+Operação:Inclusão ou Alteração
+Campo : ZTL_CHAVE 
+
+Operação:Inclusão ou Alteração
+Campo : ZTL_CAMPO 
+
+Operação:Inclusão ou Alteração
+Campo : ZTL_VALANT
+
+Operação:Inclusão ou Alteração
+Campo : ZTL_VALNOV
+
+Operação:Inclusão ou Alteração
+Campo : ZTL_JUSTIF
+
+Operação:Inclusão ou Alteração
+Campo : ZTL_USER  
+
+Operação:Inclusão ou Alteração
+Campo : ZTL_DATA  
+
+Operação:Inclusão ou Alteração
+Campo : ZTL_HORA  
+
+Operação:Inclusão ou Alteração
+Campo : ZZ1_FILIAL
+
+Operação:Inclusão ou Alteração
+Campo : ZZ1_SEQ   
+
+Operação:Inclusão ou Alteração
+Campo : ZZ1_ROTINA
+
+Operação:Inclusão ou Alteração
+Campo : ZZ1_TABELA
+
+Operação:Inclusão ou Alteração
+Campo : ZZ1_CHAVE 
+
+Operação:Inclusão ou Alteração
+Campo : ZZ1_CAMPO 
+
+Operação:Inclusão ou Alteração
+Campo : ZZ1_VALANT
+
+Operação:Inclusão ou Alteração
+Campo : ZZ1_VALNOV
+
+Operação:Inclusão ou Alteração
+Campo : ZZ1_JUSTIF
+
+Operação:Inclusão ou Alteração
+Campo : ZZ1_USER  
+
+Operação:Inclusão ou Alteração
+Campo : ZZ1_DATA  
+
+Operação:Inclusão ou Alteração
+Campo : ZZ1_HORA  
+
+Operação:Inclusão ou Alteração
+Campo : ZZ2_FILIAL
+
+Operação:Inclusão ou Alteração
+Campo : ZZ2_DOC   
+
+Operação:Inclusão ou Alteração
+Campo : ZZ2_PRODUT
+
+Operação:Inclusão ou Alteração
+Campo : ZZ2_QUANT 
+
+Operação:Inclusão ou Alteração
+Campo : ZZ2_ARMORI
+
+Operação:Inclusão ou Alteração
+Campo : ZZ2_ARMDES
+
+Operação:Inclusão ou Alteração
+Campo : ZZ2_JUSTIF
+
+Operação:Inclusão ou Alteração
+Campo : ZZ2_USUARI
+
+Operação:Inclusão ou Alteração
+Campo : ZZ2_DATA  
+
+Operação:Inclusão ou Alteração
+Campo : ZZ2_HORA  
+
+Operação:Inclusão ou Alteração
+Campo : ZZ2_ORIGEM
+
+
+------------
+SX6
+
+Operação:Inclusão ou Alteração
+Filial :   
+Parâmetro : CP_AUDFOR 
+Sobreposição de conteúdo ativada
+
+
+------------
+Helps (hlppack*.txt)
+
+Chave : ZTL_SEQ   
+Chave : ZTL_ROTINA
+Chave : ZTL_TABELA
+Chave : ZTL_CHAVE 
+Chave : ZTL_CAMPO 
+Chave : ZTL_VALANT
+Chave : ZTL_VALNOV
+Chave : ZTL_JUSTIF
+Chave : ZTL_USER  
+Chave : ZTL_DATA  
+Chave : ZTL_HORA  
+Chave : ZZ1_SEQ   
+Chave : ZZ1_ROTINA
+Chave : ZZ1_TABELA
+Chave : ZZ1_CHAVE 
+Chave : ZZ1_CAMPO 
+Chave : ZZ1_VALANT
+Chave : ZZ1_VALNOV
+Chave : ZZ1_JUSTIF
+Chave : ZZ1_USER  
+Chave : ZZ1_DATA  
+Chave : ZZ1_HORA  
+Chave : ZZ2_DOC   
+Chave : ZZ2_PRODUT
+Chave : ZZ2_QUANT 
+Chave : ZZ2_ARMORI
+Chave : ZZ2_ARMDES
+Chave : ZZ2_JUSTIF
+Chave : ZZ2_USUARI
+Chave : ZZ2_DATA  
+Chave : ZZ2_HORA  
+Chave : ZZ2_ORIGEM
