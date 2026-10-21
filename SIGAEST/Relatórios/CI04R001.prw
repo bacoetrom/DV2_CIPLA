@@ -11,20 +11,19 @@ período: Saldo Inicial + Compras - Consumo - Perdas/Transferências = Saldo Final
 Base: MATR445 (estrutura TReport / query / CalcEst), MATR425 (filtro de validade
 em SB8), MATR435 (CalcEstL por lote) e MATR330 (classificação por CF/CFOP).
 
-Dicionário necessário
----------------------
-Grupo de perguntas CI04R001 (SX1):
-  01 Filial de ?                    C  tam. filial   F3 SM0
-  02 Filial até ?                   C  tam. filial   F3 SM0
-  03 Período de ?                   D  8
-  04 Período até ?                  D  8
-  05 Grupo de Produto de ?          C  tam. BM_GRUPO F3 SBM
-  06 Grupo de Produto até ?         C  tam. BM_GRUPO F3 SBM
-  07 Produto/Reagente de ?          C  tam. B1_COD   F3 SB1
-  08 Produto/Reagente até ?         C  tam. B1_COD   F3 SB1
-  09 Validade de ?                  D  8
-  10 Validade até ?                 D  8
-  11 Quais Órgãos Fiscalizadores ?  C  10            X1_VALID: U_CI04ROrg()
+Parâmetros (ParamBox - não depende de SX1; respostas salvas no perfil do usuário):
+  MV_PAR01 Filial de                C  tam. filial   F3 SM0
+  MV_PAR02 Filial até               C  tam. filial   F3 SM0
+  MV_PAR03 Período de               D
+  MV_PAR04 Período até              D
+  MV_PAR05 Grupo de Produto de      C  tam. BM_GRUPO F3 SBM
+  MV_PAR06 Grupo de Produto até     C  tam. BM_GRUPO F3 SBM
+  MV_PAR07 Produto/Reagente de      C  tam. B1_COD   F3 SB1
+  MV_PAR08 Produto/Reagente até     C  tam. B1_COD   F3 SB1
+  MV_PAR09 Validade de              D
+  MV_PAR10 Validade até             D
+  MV_PAR11 a MV_PAR15 Órgãos fiscalizadores (checkbox): Polícia Civil, Polícia Federal,
+           Exército, ANVISA, Não Controlado
 
 Flags de produto controlado na SB5 (configuração padrão TOTVS dos mapas):
   MV_PRODPF  -> campo da Polícia Federal  (ex.: B5_PRODPF)   - MATA950/MATR913
@@ -54,8 +53,10 @@ Campos inexistentes no dicionário são tratados como vazios (o relatório não abor
 #DEFINE D3_CF_TRANSF "RE4/DE4/RE7/DE7"
 #DEFINE TM_PERDAS    "499/999"
 
-//-- Pergunta 11 - órgãos fiscalizadores (códigos de 2 posições)
+//-- Órgãos fiscalizadores (códigos de 2 posições, na ordem dos checkboxes MV_PAR11..MV_PAR15)
 #DEFINE ORG_CODIGOS  "PCPFEXAVNC"
+#DEFINE PAR_ORG_INI  11
+#DEFINE QTD_PARAM    15
 #DEFINE MAX_DIAS     4095
 #DEFINE NUM_PERG     "CI04R001"
 
@@ -64,6 +65,7 @@ Campos inexistentes no dicionário são tratados como vazios (o relatório não abor
 #DEFINE ORG_DESC     2
 #DEFINE ORG_CAMPO    3
 #DEFINE ORG_PARAM    4
+#DEFINE ORG_PREENCH  5   //-- .T.: controlado quando o campo está preenchido (ex.: registro ANVISA); .F.: flag = 'S'
 
 /*/{Protheus.doc} CI04R001
 Ponto de entrada do relatório.
@@ -72,12 +74,61 @@ User Function CI04R001()
 
 Local oReport
 
-Pergunte(NUM_PERG, .F.)
+Private mv_par01, mv_par02, mv_par03, mv_par04, mv_par05, mv_par06, mv_par07, mv_par08
+Private mv_par09, mv_par10, mv_par11, mv_par12, mv_par13, mv_par14, mv_par15
+
+If !fParams()
+	Return
+EndIf
 
 oReport := ReportDef()
 oReport:PrintDialog()
 
 Return
+
+/*/{Protheus.doc} fParams
+Tela de parâmetros (ParamBox). Também acionada pelo botão "Parâmetros" do TReport.
+@type  Static Function
+@author bacoetrom@gmail.com
+@since  21/10/2026
+@return logical, .T. se confirmado
+/*/
+Static Function fParams()
+
+Local aPergs  := {}
+Local aRet    := {}
+Local nTamFil := FWSizeFilial()
+Local nTamGrp := TamSX3("BM_GRUPO")[1]
+Local nTamPrd := TamSX3("B1_COD")[1]
+Local lRet    := .F.
+Local nI      := 0
+
+aAdd(aPergs, {1, "Filial de"           , Space(nTamFil)          , "@!", "", "SM0", "", 50, .F.})
+aAdd(aPergs, {1, "Filial até"          , Replicate("Z", nTamFil) , "@!", "", "SM0", "", 50, .T.})
+aAdd(aPergs, {1, "Período de"          , FirstDate(dDataBase)    , ""  , "", ""   , "", 50, .T.})
+aAdd(aPergs, {1, "Período até"         , LastDate(dDataBase)     , ""  , "", ""   , "", 50, .T.})
+aAdd(aPergs, {1, "Grupo de Produto de" , Space(nTamGrp)          , "@!", "", "SBM", "", 50, .F.})
+aAdd(aPergs, {1, "Grupo de Produto até", Replicate("Z", nTamGrp) , "@!", "", "SBM", "", 50, .T.})
+aAdd(aPergs, {1, "Produto/Reagente de" , Space(nTamPrd)          , "@!", "", "SB1", "", 80, .F.})
+aAdd(aPergs, {1, "Produto/Reagente até", Replicate("Z", nTamPrd) , "@!", "", "SB1", "", 80, .T.})
+aAdd(aPergs, {1, "Validade de"         , StoD("19000101")        , ""  , "", ""   , "", 50, .T.})
+aAdd(aPergs, {1, "Validade até"        , StoD("29991231")        , ""  , "", ""   , "", 50, .T.})
+aAdd(aPergs, {5, "Órgão: Polícia Civil"   , .T., 120, "", .F.})
+aAdd(aPergs, {5, "Órgão: Polícia Federal" , .T., 120, "", .F.})
+aAdd(aPergs, {5, "Órgão: Exército"        , .T., 120, "", .F.})
+aAdd(aPergs, {5, "Órgão: ANVISA"          , .T., 120, "", .F.})
+aAdd(aPergs, {5, "Não Controlado"         , .F., 120, "", .F.})
+
+If ParamBox(aPergs, "Parâmetros - Reagentes Controlados", @aRet, , , .T., , , , NUM_PERG, .T., .T.)
+	For nI := 1 To QTD_PARAM
+		&("mv_par" + StrZero(nI, 2)) := aRet[nI]
+	Next nI
+	lRet := .T.
+EndIf
+
+FwFreeArray(aPergs)
+
+Return lRet
 
 /*/{Protheus.doc} ReportDef
 Definição do layout (colunas bilíngues PT/EN).
@@ -93,7 +144,7 @@ Local cTitulo  := "Balanço de Estoque de Reagentes Controlados / Controlled Reag
 Local cDescri  := "Consolida as informações regulatórias dos reagentes controlados com o balanço de " + ;
                   "estoque do período (saldo inicial, compras, consumo, perdas/transferências e saldo final)."
 
-oReport := TReport():New(NUM_PERG, cTitulo, NUM_PERG, {|oRep| ReportPrint(oRep)}, cDescri)
+oReport := TReport():New(NUM_PERG, cTitulo, {|| fParams()}, {|oRep| ReportPrint(oRep)}, cDescri)
 oReport:SetLandscape()
 oReport:SetTotalInLine(.F.)
 
@@ -168,7 +219,14 @@ Local oCfg     := Nil
 Local cCondOrg := ""
 Local cErro    := ""
 Local cFilBak  := cFilAnt
+Local oDiag    := JsonObject():New()
 Local nI       := 0
+
+oDiag["FILIAIS"  ] := ""
+oDiag["LIDOS"    ] := 0
+oDiag["DESCART"  ] := 0
+oDiag["IMPRESSOS"] := 0
+oDiag["EXEMPLO"  ] := ""
 
 aOrgaos := fOrgaos()
 
@@ -204,11 +262,25 @@ For nI := 1 To Len(aFiliais)
 	EndIf
 	cFilAnt := aFiliais[nI]        //-- CalcEst/CalcEstL e xFilial() usam a filial corrente
 	oReport:IncMeter()
-	fProcFil(oReport, oSecao, aOrgaos, cCondOrg, oCfg)
+	fProcFil(oReport, oSecao, aOrgaos, cCondOrg, oCfg, oDiag)
 Next nI
 
 oSecao:Finish()
 cFilAnt := cFilBak
+
+//-- Nada impresso: mostra onde os registros foram descartados
+If oDiag["IMPRESSOS"] == 0 .And. !oReport:Cancel()
+	Help(NIL, NIL, NUM_PERG, NIL, ;
+	     "Nenhuma linha impressa." + CRLF + ;
+	     "Filiais processadas: " + oDiag["FILIAIS"] + CRLF + ;
+	     "Registros lidos nas consultas: " + cValToChar(oDiag["LIDOS"]) + CRLF + ;
+	     "Descartados (sem saldo e sem movimento): " + cValToChar(oDiag["DESCART"]) + CRLF + ;
+	     "Exemplo descartado: " + oDiag["EXEMPLO"] + CRLF + ;
+	     "Filtro de órgãos: " + cCondOrg, ;
+	     1, 0, NIL, NIL, NIL, NIL, NIL, {"Revise os parâmetros e o cadastro dos produtos controlados."})
+EndIf
+
+FreeObj(oDiag)
 
 FwFreeArray(aSM0)
 FwFreeArray(aFiliais)
@@ -220,7 +292,7 @@ Validação dos filtros obrigatórios (fluxo alternativo A1) e montagem da condição
 /*/
 Static Function fValida(aOrgaos, cCondOrg, cErro)
 
-Local cOrg   := fLimpaOrg(mv_par11)
+Local cOrg   := fOrgSel()
 Local aCond  := {}
 Local aNC    := {}
 Local cCod   := ""
@@ -264,9 +336,17 @@ For nI := 1 To Len(cOrg) Step 2
 	EndIf
 	cCod := SubStr(cOrg, nI, 2)
 	If cCod == "NC"
-		//-- Não controlado: nenhuma das flags configuradas = 'S'
-		aEval(aOrgaos, {|x| If(!Empty(x[ORG_CAMPO]), aAdd(aNC, "COALESCE(SB5." + x[ORG_CAMPO] + ",' ') <> 'S'"), Nil)})
-		aAdd(aCond, If(Empty(aNC), "1 = 1", "(" + fJunta(aNC, " AND ") + ")"))
+		//-- Não controlado: nenhum dos órgãos configurados se aplica ao produto
+		For nPos := 1 To Len(aOrgaos)
+			If !Empty(aOrgaos[nPos][ORG_CAMPO])
+				aAdd(aNC, fCondOrg(aOrgaos[nPos], .F.))
+			EndIf
+		Next nPos
+		If Empty(aNC)
+			aAdd(aCond, "1 = 1")
+		Else
+			aAdd(aCond, "(" + fJunta(aNC, " AND ") + ")")
+		EndIf
 	Else
 		nPos := aScan(aOrgaos, {|x| x[ORG_COD] == cCod})
 		If nPos == 0
@@ -278,7 +358,7 @@ For nI := 1 To Len(cOrg) Step 2
 			            " (parâmetro " + aOrgaos[nPos][ORG_PARAM] + " vazio ou campo inexistente na SB5).")
 			lRet  := .F.
 		Else
-			aAdd(aCond, "SB5." + aOrgaos[nPos][ORG_CAMPO] + " = 'S'")
+			aAdd(aCond, fCondOrg(aOrgaos[nPos], .T.))
 		EndIf
 	EndIf
 Next nI
@@ -292,7 +372,7 @@ Return lRet
 /*/{Protheus.doc} fProcFil
 Processa a filial corrente: produtos com rastro (SB8) e sem rastro (SB2).
 /*/
-Static Function fProcFil(oReport, oSecao, aOrgaos, cCondOrg, oCfg)
+Static Function fProcFil(oReport, oSecao, aOrgaos, cCondOrg, oCfg, oDiag)
 
 Local oMov     := fCarregaMov()
 Local oCache   := JsonObject():New()
@@ -302,6 +382,9 @@ Local cQry     := ""
 Local cChave   := ""
 Local cChvAnt  := ""
 Local lSubLote := .F.
+
+oDiag["FILIAIS"] += "[" + cFilAnt + " SB8='" + xFilial("SB8") + "' SB1='" + xFilial("SB1") + ;
+                    "' SB5='" + xFilial("SB5") + "'] "
 
 //-- 1) Produtos com rastro de lote/sublote: um registro por Produto + Armazém + Lote (+ Sub-Lote)
 cQry := "SELECT SB8.B8_PRODUTO PRODUTO, SB8.B8_LOCAL ARMAZEM, SB8.B8_LOTECTL LOTE, SB8.B8_NUMLOTE SUBLOTE, "
@@ -335,9 +418,11 @@ While !(cAlias)->(Eof()) .And. !oReport:Cancel()
 	//-- Rastro por lote pode ter mais de um SB8 para o mesmo lote: usa o primeiro (entrada mais antiga)
 	If cChave <> cChvAnt
 		cChvAnt := cChave
-		oItem   := fMontaItem(cAlias, .T., lSubLote, oMov, cChave, aOrgaos, oCfg, oCache)
-		If ValType(oItem) == "O"
+		oDiag["LIDOS"] += 1
+		oItem   := fMontaItem(cAlias, .T., lSubLote, oMov, cChave, aOrgaos, oCfg, oCache, oDiag)
+		If ValType(oItem) $ "O/J"   //-- JsonObject retorna "J"
 			fImprime(oSecao, oItem)
+			oDiag["IMPRESSOS"] += 1
 			FreeObj(oItem)
 		EndIf
 	EndIf
@@ -368,9 +453,11 @@ TcSetField(cAlias, "EMAX", "N", TamSX3("B1_EMAX")[1], TamSX3("B1_EMAX")[2])
 
 While !(cAlias)->(Eof()) .And. !oReport:Cancel()
 	cChave := fChave((cAlias)->PRODUTO, (cAlias)->ARMAZEM, "", "")
-	oItem  := fMontaItem(cAlias, .F., .F., oMov, cChave, aOrgaos, oCfg, oCache)
-	If ValType(oItem) == "O"
+	oDiag["LIDOS"] += 1
+	oItem  := fMontaItem(cAlias, .F., .F., oMov, cChave, aOrgaos, oCfg, oCache, oDiag)
+	If ValType(oItem) $ "O/J"   //-- JsonObject retorna "J"
 		fImprime(oSecao, oItem)
+		oDiag["IMPRESSOS"] += 1
 		FreeObj(oItem)
 	EndIf
 	(cAlias)->(DbSkip())
@@ -486,7 +573,7 @@ Return oMov
 Calcula o balanço do item e reúne as informações regulatórias. Retorna Nil quando
 não há saldo nem movimento no período.
 /*/
-Static Function fMontaItem(cAlias, lLote, lSubLote, oMov, cChave, aOrgaos, oCfg, oCache)
+Static Function fMontaItem(cAlias, lLote, lSubLote, oMov, cChave, aOrgaos, oCfg, oCache, oDiag)
 
 Local oItem    := Nil
 Local cProd    := (cAlias)->PRODUTO
@@ -516,6 +603,12 @@ EndIf
 
 //-- Sem saldo e sem movimento no período: não imprime
 If nIni == 0 .And. nSis == 0 .And. aMov[1] == 0 .And. aMov[2] == 0 .And. aMov[3] == 0
+	oDiag["DESCART"] += 1
+	If Empty(oDiag["EXEMPLO"])
+		oDiag["EXEMPLO"] := cFilAnt + " / " + AllTrim(cProd) + " / " + cLocal + " / " + AllTrim(cLote) + ;
+		                    " (Sld. " + DtoC(mv_par03) + " = " + cValToChar(nIni) + ;
+		                    ", Sld. " + DtoC(mv_par04 + 1) + " = " + cValToChar(nSis) + ")"
+	EndIf
 	Return Nil
 EndIf
 
@@ -686,30 +779,65 @@ EndIf
 Return
 
 /*/{Protheus.doc} fOrgaos
-Órgãos fiscalizadores: código, descrição, campo da flag na SB5 e parâmetro de origem.
+Órgãos fiscalizadores: código, descrição, campo na SB5, parâmetro de origem e regra
+(flag = 'S' ou campo preenchido).
 /*/
 Static Function fOrgaos()
 
 Local aOrgaos := {}
 
-aAdd(aOrgaos, {"PC", "POLÍCIA CIVIL"  , fCampoMV("MV_MTR947A")      , "MV_MTR947A"})
-aAdd(aOrgaos, {"PF", "POLÍCIA FEDERAL", fCampoMV("MV_PRODPF")       , "MV_PRODPF" })
-aAdd(aOrgaos, {"EX", "EXÉRCITO"       , fCampoMV("MV_MTR949A")      , "MV_MTR949A"})
-aAdd(aOrgaos, {"AV", "ANVISA"         , fCampoSB5(CPO_ANVISA, .T.)  , ""          })   //-- sem flag padrão (P7)
+aAdd(aOrgaos, {"PC", "POLÍCIA CIVIL"  , fCampoMV("MV_MTR947A")      , "MV_MTR947A", .F.})
+aAdd(aOrgaos, {"PF", "POLÍCIA FEDERAL", fCampoMV("MV_PRODPF")       , "MV_PRODPF" , .F.})
+aAdd(aOrgaos, {"EX", "EXÉRCITO"       , fCampoMV("MV_MTR949A")      , "MV_MTR949A", .F.})
+aAdd(aOrgaos, {"AV", "ANVISA"         , fCampoSB5(CPO_ANVISA, .T.)  , ""          , .T.})   //-- registro ANVISA: preenchido = controlado
 
 Return aOrgaos
 
+/*/{Protheus.doc} fCondOrg
+Condição SQL do órgão: produto controlado (lControla = .T.) ou não controlado (.F.) por ele.
+@type  Static Function
+@author bacoetrom@gmail.com
+@since  21/10/2026
+@param aOrg, array, item do array de órgãos (fOrgaos)
+@param lControla, logical, .T. condição positiva; .F. condição negada
+@return character, condição SQL
+/*/
+Static Function fCondOrg(aOrg, lControla)
+
+Local cCampo := "COALESCE(SB5." + aOrg[ORG_CAMPO] + ",' ')"
+Local cRet   := ""
+
+If aOrg[ORG_PREENCH]
+	If lControla
+		cRet := cCampo + " <> ' '"
+	Else
+		cRet := cCampo + " = ' '"
+	EndIf
+Else
+	If lControla
+		cRet := cCampo + " = 'S'"
+	Else
+		cRet := cCampo + " <> 'S'"
+	EndIf
+EndIf
+
+Return cRet
+
 /*/{Protheus.doc} fDescOrg
-Órgãos cuja flag está = 'S' para o produto posicionado na SB5.
+Órgãos que controlam o produto posicionado na SB5 (flag = 'S' ou campo preenchido).
 /*/
 Static Function fDescOrg(aOrgaos)
 
 Local aDesc := {}
+Local cConteudo := ""
 Local nI    := 0
 
 For nI := 1 To Len(aOrgaos)
-	If !Empty(aOrgaos[nI][ORG_CAMPO]) .And. fCpoSB5(aOrgaos[nI][ORG_CAMPO], "") == "S"
-		aAdd(aDesc, aOrgaos[nI][ORG_COD])
+	If !Empty(aOrgaos[nI][ORG_CAMPO])
+		cConteudo := fCpoSB5(aOrgaos[nI][ORG_CAMPO], "")
+		If (aOrgaos[nI][ORG_PREENCH] .And. !Empty(cConteudo)) .Or. (!aOrgaos[nI][ORG_PREENCH] .And. cConteudo == "S")
+			aAdd(aDesc, aOrgaos[nI][ORG_COD])
+		EndIf
 	EndIf
 Next nI
 
@@ -826,50 +954,24 @@ Next nI
 
 Return cRet
 
-/*/{Protheus.doc} fLimpaOrg
-Normaliza o conteúdo da pergunta 11 (remove espaços e marcadores de não selecionado).
+/*/{Protheus.doc} fOrgSel
+Códigos dos órgãos marcados nos checkboxes MV_PAR11..MV_PAR15, concatenados
+(ex.: PFEX = Polícia Federal + Exército).
+@type  Static Function
+@author bacoetrom@gmail.com
+@since  21/10/2026
+@return character, códigos selecionados
 /*/
-Static Function fLimpaOrg(cOrg)
-Return StrTran(StrTran(AllTrim(cOrg), "*", ""), " ", "")
+Static Function fOrgSel()
 
-/*/{Protheus.doc} CI04ROrg
-X1_VALID da pergunta 11: seleção múltipla dos órgãos fiscalizadores (tela "Escolha Padrões").
-Grava em MV_PAR11 os códigos marcados concatenados (ex.: PFEX = Polícia Federal + Exército).
-@type User Function
-/*/
-User Function CI04ROrg()
+Local cRet := ""
+Local nI   := 0
 
-Local aBox    := {"00001 - POLÍCIA CIVIL", "00002 - POLÍCIA FEDERAL", "00003 - EXÉRCITO", ;
-                  "00004 - ANVISA", "00005 - NÃO CONTROLADO"}
-Local aCodRet := {}
-Local cVar    := ReadVar()
-Local cRet    := ""
-Local nI      := 0
-
-If !IsBlind()
-	If f_Opcoes(@aCodRet, ;           // uVarRet
-	            "Escolha Padrões", ;  // cTitulo
-	            @aBox, ;              // aOpcoes
-	            ORG_CODIGOS, ;        // cOpcoes
-	            , ;                   // nLin1
-	            , ;                   // nCol1
-	            , ;                   // l1Elem
-	            2, ;                  // nTam
-	            Len(aBox), ;          // nElemRet
-	            , ;                   // lMultSelect
-	            , ;                   // lComboBox
-	            , ;                   // cCampo
-	            , ;                   // lNotOrdena
-	            , ;                   // lNotPesq
-	            .T.)                  // lForceRetArr
-		For nI := 1 To Len(aCodRet)
-			cRet += aCodRet[nI]
-		Next nI
-		&(cVar) := PadR(cRet, 10)
+For nI := PAR_ORG_INI To QTD_PARAM
+	If ValType(&("mv_par" + StrZero(nI, 2))) == "L" .And. &("mv_par" + StrZero(nI, 2))
+		cRet += SubStr(ORG_CODIGOS, ((nI - PAR_ORG_INI) * 2) + 1, 2)
 	EndIf
-EndIf
+Next nI
 
-FwFreeArray(aBox)
-FwFreeArray(aCodRet)
+Return cRet
 
-Return .T.
