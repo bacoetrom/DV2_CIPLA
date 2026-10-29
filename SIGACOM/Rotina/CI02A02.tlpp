@@ -9,7 +9,7 @@ Grava um registro genérico de auditoria na tabela ZZ1.
 @version 1.0
 @author Pablo Regis
 @since 27/08/2026
-@param cRotina, character, "Rotina/função de origem (ex.: CI02A001, A010TOK)"
+@param cRotina, character, "Rotina/função de origem (ex.: CI02A01, A010TOK)"
 @param cTabela, character, "Alias da tabela afetada (ex.: SA2, SB1)"
 @param cChave, character, "Chave do registro afetado"
 @param cCampo, character, "Nome do campo alterado"

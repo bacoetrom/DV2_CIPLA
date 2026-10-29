@@ -1,21 +1,22 @@
 #Include "Protheus.ch"
 #Include "FWMVCDef.ch"
 
-/*/{Protheus.doc} CI04A001
+/*/{Protheus.doc} CI04A01
 Rotina de consulta em MVC da Tabela de Auditoria de Transferencias (ZZ2).
 @type function
 @author  Desenvolvedor Protheus
 @since   22/09/2026
 /*/
-User Function CI04A001()
+User Function CI04A01()
     Local oBrowse := FWMBrowse():New()
     
     oBrowse:SetAlias("ZZ2")
-    oBrowse:SetDescription("Consulta de Auditoria - Transferencia entre Armazens")
+    oBrowse:SetDescription("Consulta de Auditoria - Transferência entre Armazéns")
+    oBrowse:SetMenuDef("CI04A01")
     
     // Adiciona legendas visuais para a Origem do Processo
-    oBrowse:AddLegend("ZZ2_ORIGEM == '1'", "GREEN", "Inclusao Manual (Com Senha)")
-    oBrowse:AddLegend("ZZ2_ORIGEM == '2'", "BLUE" , "Inclusao Automatica (Job/API)")
+    oBrowse:AddLegend("ZZ2_ORIGEM == '1'", "GREEN", "Inclusão Manual (Com Senha)")
+    oBrowse:AddLegend("ZZ2_ORIGEM == '2'", "BLUE" , "Inclusão Automática (Job/API)")
     
     oBrowse:Activate()
 Return NIL
@@ -30,7 +31,7 @@ Construcao do Modelo de Dados (MVC)
 /*/
 Static Function ModelDef()
     Local oStruZZ2 := FWFormStruct(1, "ZZ2")
-    Local oModel   := MPFormModel():New("CI04A001M")
+    Local oModel   := MPFormModel():New("CI04A01M")
     
     oModel:AddFields("ZZ2MASTER", NIL, oStruZZ2)
     oModel:SetPrimaryKey({"ZZ2_FILIAL", "ZZ2_DOC", "ZZ2_PRODUT"})
@@ -47,7 +48,7 @@ Construção do MVC
 @return object, view
 /*/
 Static Function ViewDef()
-    Local oModel   := FWLoadModel("CI04A001")
+    Local oModel   := FWLoadModel("CI04A01")
     Local oStruZZ2 := FWFormStruct(2, "ZZ2")
     Local oView    := FWFormView():New()
     
@@ -71,6 +72,6 @@ Static Function MenuDef()
 
 	Local aRotina := {}
 
-	ADD OPTION aRotina TITLE "Visualizar" ACTION "VIEWDEF.CI04A001" OPERATION 2 ACCESS 0
+	ADD OPTION aRotina TITLE "Visualizar" ACTION "VIEWDEF.CI04A01" OPERATION 2 ACCESS 0
 
 Return aRotina

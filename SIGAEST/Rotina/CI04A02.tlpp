@@ -35,7 +35,7 @@ User Function ZZ2GravaLog(cRotina, cDocNum, cProduto, nQuant, cArmOri, cArmDes, 
             ZZ2->ZZ2_ARMDES  := cArmDes
             ZZ2->ZZ2_ORIGEM  := cOrigem
             ZZ2->ZZ2_JUSTIF  := AllTrim(cJustificativa)
-            ZZ2->ZZ2_USUARIO := Alltrim(UsrRetName(RetCodUsr()))
+            ZZ2->ZZ2_USUARI := Alltrim(UsrRetName(RetCodUsr()))
             ZZ2->ZZ2_DATA    := Date()
             ZZ2->ZZ2_HORA    := Time()            
             ZZ2->(MsUnlock())

@@ -1,7 +1,7 @@
 #INCLUDE "PROTHEUS.CH"
 #INCLUDE "TOPCONN.CH"
 
-/*/{Protheus.doc} CI04R001
+/*/{Protheus.doc} CI04R01
 Relatório de Balanço de Estoque de Reagentes Controlados (MIT041).
 
 Consolida, por Filial + Produto + Lote + Armazém, as informações regulatórias do
@@ -63,7 +63,7 @@ campo não existe é ignorado no filtro, sem abortar o relatório. Se nenhum campo 
 #DEFINE PAR_ORG_INI  11
 #DEFINE QTD_PARAM    15
 #DEFINE MAX_DIAS     4095
-#DEFINE NUM_PERG     "CI04R001"
+#DEFINE NUM_PERG     "CI04R01"
 
 //-- Posições do array de órgãos
 #DEFINE ORG_COD      1
@@ -72,10 +72,10 @@ campo não existe é ignorado no filtro, sem abortar o relatório. Se nenhum campo 
 #DEFINE ORG_PARAM    4
 #DEFINE ORG_PREENCH  5   //-- .T.: controlado quando o campo está preenchido (ex.: registro ANVISA); .F.: flag = 'S'
 
-/*/{Protheus.doc} CI04R001
+/*/{Protheus.doc} CI04R01
 Ponto de entrada do relatório.
 /*/
-User Function CI04R001()
+User Function CI04R01()
 
 Local oReport
 

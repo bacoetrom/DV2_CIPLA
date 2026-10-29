@@ -3,12 +3,12 @@
 #Include "FWMVCDef.ch"
 
 //-------------------------------------------------------------------
-// CI02A004 - Consulta de Log de Auditoria Genérico (tabela ZZ1)
+// CI02A04 - Consulta de Log de Auditoria Genérico (tabela ZZ1)
 //
 // Rotina MVC (Model-View-Controller) para VISUALIZAÇÃO dos registros
 // gravados pelo motor genérico de auditoria U_ZZ1GravaLog (ZZ1U001),
 // usado hoje pelo Ponto de Entrada A010TOK (MATA010 - Cadastro de
-// Produtos, campo B1_TIPO) e pela função CI02A001 (SA2, campo
+// Produtos, campo B1_TIPO) e pela função CI02A01 (SA2, campo
 // A2_MSBLQL), podendo ser reaproveitado por qualquer outra rotina.
 //
 // Por se tratar de uma tabela de auditoria/log, esta rotina expõe
@@ -16,17 +16,18 @@
 // Alterar ou Excluir pela tela.
 //-------------------------------------------------------------------
 
-/*/{Protheus.doc} CI02A004
+/*/{Protheus.doc} CI02A04
 Função principal da rotina. Monta o Browse (lista de registros) da
 tabela ZZ1 e ativa a tela.
 /*/
-User Function CI02A004()
+User Function CI02A04()
 
 	Local oBrowse
 
 	oBrowse := FWMBrowse():New()
 	oBrowse:SetAlias("ZZ1")
-	oBrowse:SetDescription("Log de Auditoria (ZZ1)")
+	oBrowse:SetDescription("Auditoria dos Campos Fornecedor e FEFO")
+	oBrowse:SetMenuDef("CI02A04")
 	oBrowse:Activate()
 
 Return
@@ -36,14 +37,14 @@ Define o Model (regras de dados) do log de auditoria genérico ZZ1.
 @type function
 @author Pablo Regis
 @since 27/08/2026
-@return object, "Instância de MPFormModel do CI02A004"
+@return object, "Instância de MPFormModel do CI02A04"
 /*/
 Static Function ModelDef()
 
 	Local oStruZZ1 := FWFormStruct(1, "ZZ1")
 	Local oModel
 
-	oModel := MPFormModel():New("CI02A004M")
+	oModel := MPFormModel():New("CI02A04M")
 	oModel:AddFields("ZZ1MASTER", /*cOwner*/, oStruZZ1)
 	oModel:SetPrimaryKey({"ZZ1_FILIAL", "ZZ1_SEQ"})
 	oModel:SetDescription("Log de Auditoria Genérico")
@@ -60,7 +61,7 @@ ZZ1 dispostos em uma única área (Box) horizontal.
 /*/
 Static Function ViewDef()
 
-	Local oModel   := FWLoadModel("CI02A004")
+	Local oModel   := FWLoadModel("CI02A04")
 	Local oStruZZ1 := FWFormStruct(2, "ZZ1")
 	Local oView
 
@@ -86,6 +87,6 @@ Static Function MenuDef()
 
 	Local aRotina := {}
 
-	ADD OPTION aRotina TITLE "Visualizar" ACTION "VIEWDEF.CI02A004" OPERATION 2 ACCESS 0
+	ADD OPTION aRotina TITLE "Visualizar" ACTION "VIEWDEF.CI02A04" OPERATION 2 ACCESS 0
 
 Return aRotina

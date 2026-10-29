@@ -7,8 +7,8 @@ no Estorno (A175Estorna) e no ExecAuto.
 Exige Assinatura Eletronica (Justificativa + Senha do usuario corrente)
 antes de confirmar o movimento, e registra a auditoria apenas das linhas
 novas do aCols (o aCols do MATA175 contem todo o historico do SD7) na
-tabela ZZ2, via classe ZZ2AssinaEletronica (ver CI04A003.tlpp) e
-U_ZZ2GravaLog (ver CI04A002.tlpp). O tipo do movimento (LIBERACAO,
+tabela ZZ2, via classe ZZ2AssinaEletronica (ver CI04A03.tlpp) e
+U_ZZ2GravaLog (ver CI04A02.tlpp). O tipo do movimento (LIBERACAO,
 REJEICAO ou ESTORNO ...) e gravado como prefixo da justificativa.
 
 @author  Pablo Regis
@@ -38,7 +38,7 @@ User Function MT175ATU() as Logical
     aItens := fItensNovos()
 
     oAssinaZZ2 := ZZ2AssinaEletronica():New("MT175ATU", cDocNum, cOrigemProc)
-    oAssinaZZ2:SetTitulo("Assinatura Eletronica - Liberacao/Rejeicao CQ")
+    oAssinaZZ2:SetTitulo("Assinatura Eletrônica - Liberação/Rejeição CQ")
     oAssinaZZ2:SetPosicoesGrid(1, 2, 3, 4)
     oAssinaZZ2:SetPosicaoTipo(5)
     oAssinaZZ2:SetItens(aItens)
@@ -51,7 +51,7 @@ User Function MT175ATU() as Logical
     lRet := oAssinaZZ2:Confirma()
 
     If !lRet
-        Help(NIL, NIL, "VALIDA_CQ", NIL, "A liberacao/rejeicao do CQ foi cancelada. Justificativa e senha sao obrigatorias.", 1, 0)
+        Help(NIL, NIL, "VALIDA_CQ", NIL, "A liberação/rejeição do CQ foi cancelada. Justificativa e senha são obrigatórias.", 1, 0)
     EndIf
 
 Return lRet

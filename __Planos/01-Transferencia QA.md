@@ -59,8 +59,8 @@ com `SetPosicoesGrid(1, 2, 3, 4)`.
   6. Interativo → `Confirma()`; se `.F.`, `Help` no mesmo padrão do A261TOK.
 
 **Reaproveitados sem alteração:**
-- `SIGAEST/Rotina/CI04A003.tlpp` — classe `ZZ2AssinaEletronica`
-- `SIGAEST/Rotina/CI04A002.tlpp` — `U_ZZ2GravaLog`
+- `SIGAEST/Rotina/CI04A03.tlpp` — classe `ZZ2AssinaEletronica`
+- `SIGAEST/Rotina/CI04A02.tlpp` — `U_ZZ2GravaLog`
 
 ---
 
@@ -90,4 +90,4 @@ com `SetPosicoesGrid(1, 2, 3, 4)`.
 2. **Tipo do movimento:** gravado como prefixo da justificativa (`[LIBERACAO] ...`, `[REJEICAO] ...`), sem alteração de dicionário. Como um mesmo documento pode ter linhas de liberação e de rejeição, o prefixo é aplicado **por item**: a classe `ZZ2AssinaEletronica` recebeu o método opcional `SetPosicaoTipo(nPosTipo)` (padrão `0` = sem prefixo, comportamento do A261TOK inalterado).
 3. **Escopo:** vale para toda Liberação/Rejeição do CQ.
 
-**Consequência no pacote:** sem campo novo na ZZ2, o `Diferencial/manifest_update.txt` (dicionário) **não** precisa ser alterado. Compilar `MT175ATU.prw` e `CI04A003.tlpp`.
+**Consequência no pacote:** sem campo novo na ZZ2, o `Diferencial/manifest_update.txt` (dicionário) **não** precisa ser alterado. Compilar `MT175ATU.prw` e `CI04A03.tlpp`.

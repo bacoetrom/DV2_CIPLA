@@ -38,7 +38,7 @@ User Function A261TOK() as Logical
     lRet := oAssinaZZ2:Confirma()
 
     If !lRet
-        Help(NIL, NIL, "VALIDA_TRANSF", NIL, "A transferencia foi cancelada. Justificativa e senha sao obrigatorias.", 1, 0)
+        Help(NIL, NIL, "VALIDA_TRANSF", NIL, "A transferência foi cancelada. Justificativa e senha são obrigatórias.", 1, 0)
     EndIf
 
 Return lRet

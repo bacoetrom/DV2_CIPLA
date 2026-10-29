@@ -5,7 +5,7 @@
 
 #DEFINE CRLF CHR(13)+CHR(10)
 
-/*/{Protheus.doc} CI02A001
+/*/{Protheus.doc} CI02A01
 Validação de senha para confirmar a alteração de um ou mais campos sensíveis do fornecedor
 (ex.: Bloqueio - A2_MSBLQL, Qualificação - A2_XSTATU) e registro da auditoria correspondente.
 @type function
@@ -15,7 +15,7 @@ Validação de senha para confirmar a alteração de um ou mais campos sensíveis do 
 @param aAlteracoes, array, "Array de alterações de campos sensíveis já detectadas pelo chamador. Cada item é um array {cCampo, cValorAnt, cValorNovo}. Array vazio ou omitido indica que não há alteração a confirmar"
 @return logical, "retorna .T. se não houver alteração a confirmar ou se a senha/chave/justificativa forem validadas com sucesso para TODAS as alterações informadas; ou .F. se a senha/chave/justificativa informadas forem inválidas ou o usuário cancelar a confirmação"
 /*/
-User Function CI02A001(aAlteracoes as Array) as Logical
+User Function CI02A01(aAlteracoes as Array) as Logical
 
     Local aArea      := GetArea()                    as Array
     Local lRet       := .T.                          as Logical
@@ -44,7 +44,7 @@ User Function CI02A001(aAlteracoes as Array) as Logical
         Return lRet
     EndIf
 
-    ProcLogIni({}, "CI02A001")
+    ProcLogIni({}, "CI02A01")
     ProcLogAtu("INICIO")
 
     cMsgAlt := ""
@@ -111,7 +111,7 @@ User Function CI02A001(aAlteracoes as Array) as Logical
 
     // Validação concluida uma única vez: agora grava um registro de auditoria por campo alterado
     For nI := 1 To Len(aAlteracoes)
-        U_ZZ1GravaLog( "CI02A001", "SA2", cChaveForn, aAlteracoes[nI][1], ;
+        U_ZZ1GravaLog( "CI02A01", "SA2", cChaveForn, aAlteracoes[nI][1], ;
             aAlteracoes[nI][2] , ;
             aAlteracoes[nI][3] , ;
             Alltrim(_cJustif) )
@@ -147,7 +147,7 @@ Return .T.
 
 /*/{Protheus.doc} fTituloCampo
 Retorna o título do campo diretamente do dicionário de dados (SX3), pelo nome do campo,
-sem mapeamento fixo no código. Usado nas mensagens de tela e de log do CI02A001.
+sem mapeamento fixo no código. Usado nas mensagens de tela e de log do CI02A01.
 @type function
 @author Pablo Regis
 @since 10/09/2026

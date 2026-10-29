@@ -52,7 +52,7 @@ identificar a origem do registro de auditoria.
 @type method
 @author Pablo Regis
 @since 16/09/2026
-@param cRotina, character, "Rotina/função de origem (ex.: CI02A001, MT410TOK)"
+@param cRotina, character, "Rotina/função de origem (ex.: CI02A01, MT410TOK)"
 @param cTabela, character, "Alias da tabela afetada (ex.: SA2, SC6)"
 @param cChaveReg, character, "Chave do registro afetado, já concatenada pelo chamador (ex.: SA2->A2_FILIAL+A2_COD+A2_LOJA)"
 @return object, "instância da classe (permite chamadas encadeadas)"
@@ -88,7 +88,7 @@ Return Self
 /*/{Protheus.doc} SetParamChave
 Define o parâmetro de sistema (SuperGetMv) usado como "Chave de
 autorização" e seu valor default, no mesmo padrão já usado por
-CI02A001 (FS_CI02A001) e MT410TOK (FS_MT410TK). Quando não chamado,
+CI02A01 (FS_CI02A001) e MT410TOK (FS_MT410TK). Quando não chamado,
 usa "FS_" + os 7 primeiros caracteres da rotina informada no
 construtor, com default "123456" (limite de 10 caracteres do nome do
 parâmetro no dicionário SX6).
@@ -112,7 +112,7 @@ Return Self
 /*/{Protheus.doc} AddAlteracao
 Adiciona uma alteração de campo sensível à lista que será exibida e
 confirmada em Confirma(). Pode ser chamado várias vezes, uma por
-campo alterado, cobrindo o caso do CI02A001 (N campos alterados no
+campo alterado, cobrindo o caso do CI02A01 (N campos alterados no
 mesmo registro, confirmados numa única tela) e também o caso de N
 registros físicos distintos alterados numa única confirmação (ex.:
 MT410TOK validando vários itens do pedido de uma só vez), através dos
@@ -123,8 +123,8 @@ parâmetros opcionais cItemLabel/cChaveItem.
 @param cCampo, character, "Nome do campo alterado (ex.: 'A2_MSBLQL')"
 @param xValorAnt, variant, "Valor anterior do campo"
 @param xValorNovo, variant, "Valor novo do campo"
-@param cItemLabel, character, "Identificação opcional do registro/item (ex.: 'Item 0001'), exibida como prefixo na tela e no log de INFO quando uma mesma confirmação reune alterações de mais de um registro físico; vazio (default) quando a confirmação trata um único registro, mantendo o comportamento clássico de CI02A001/A010TOK"
-@param cChaveItem, character, "Chave específica deste registro para gravação no log de auditoria (ZZ1_CHAVE), usada no lugar da chave informada no construtor; vazio (default) usa a chave do construtor (::cChaveReg), mantendo o comportamento clássico de CI02A001/A010TOK onde todas as alterações pertencem ao mesmo registro"
+@param cItemLabel, character, "Identificação opcional do registro/item (ex.: 'Item 0001'), exibida como prefixo na tela e no log de INFO quando uma mesma confirmação reune alterações de mais de um registro físico; vazio (default) quando a confirmação trata um único registro, mantendo o comportamento clássico de CI02A01/A010TOK"
+@param cChaveItem, character, "Chave específica deste registro para gravação no log de auditoria (ZZ1_CHAVE), usada no lugar da chave informada no construtor; vazio (default) usa a chave do construtor (::cChaveReg), mantendo o comportamento clássico de CI02A01/A010TOK onde todas as alterações pertencem ao mesmo registro"
 @return object, "instância da classe (permite chamadas encadeadas)"
 /*/
 Method AddAlteracao(cCampo as Character, xValorAnt, xValorNovo, cItemLabel as Character, cChaveItem as Character) as Object Class ZZ1AssinaEletronica
@@ -136,7 +136,7 @@ Return Self
 /*/{Protheus.doc} SetAlteracoes
 Substitui de uma única vez toda a lista de alterações, no mesmo
 formato de array recebido hoje pelo parâmetro aAlteracoes de
-U_CI02A001 (cada item {cCampo, cValorAnt, cValorNovo}).
+U_CI02A01 (cada item {cCampo, cValorAnt, cValorNovo}).
 @type method
 @author Pablo Regis
 @since 16/09/2026
@@ -156,9 +156,9 @@ dados informados e, quando confirmados, grava um registro de
 auditoria por campo alterado via U_ZZ1GravaLog. Quando não há
 nenhuma alteração adicionada (AddAlteracao/SetAlteracoes), retorna
 .T. imediatamente sem exibir tela, no mesmo comportamento do
-CI02A001. Cabe ao chamador decidir SE deve chamar Confirma() (ex.:
+CI02A01. Cabe ao chamador decidir SE deve chamar Confirma() (ex.:
 apenas quando ALTERA .And. Len(aAlteracoes) > 0), assim como o
-próprio CI02A001 e A010TOK já fazem.
+próprio CI02A01 e A010TOK já fazem.
 @type method
 @author Pablo Regis
 @since 16/09/2026
@@ -251,7 +251,7 @@ Return ::cJustificativa
 /*/{Protheus.doc} MontaMsgAlteracoes
 Monta a mensagem consolidada "campo (título): de -> para" de todas as
 alterações adicionadas, exibida na tela de confirmação e no log de
-INFO, no mesmo formato hoje usado pelo CI02A001.
+INFO, no mesmo formato hoje usado pelo CI02A01.
 @type method
 @author Pablo Regis
 @since 16/09/2026
@@ -280,7 +280,7 @@ Return cMsg
 /*/{Protheus.doc} TituloCampo
 Retorna o título do campo diretamente do dicionário de dados (SX3),
 sem mapeamento fixo no código. Equivalente a fTituloCampo do
-CI02A001.tlpp.
+CI02A01.tlpp.
 @type method
 @author Pablo Regis
 @since 16/09/2026
@@ -307,7 +307,7 @@ Return cTitulo
 /*/{Protheus.doc} DescValor
 Retorna a descrição "amigável" de um valor de campo, via X3Combo()
 quando aplicável, para uso exclusivo na mensagem exibida ao usuário
-(tela/log de INFO). Equivalente a fDescValor do CI02A001.tlpp.
+(tela/log de INFO). Equivalente a fDescValor do CI02A01.tlpp.
 @type method
 @author Pablo Regis
 @since 16/09/2026
@@ -369,7 +369,7 @@ Return cRet
 
 /*/{Protheus.doc} ValidaSenha
 Valida a senha digitada contra a senha do próprio usuário logado,
-usando exatamente o mesmo critério já em produção em CI02A001.tlpp e
+usando exatamente o mesmo critério já em produção em CI02A01.tlpp e
 MT410TOK.tlpp: PswOrder(2) + PswSeek(cNomUsr, .T.), comparando o
 valor bruto retornado por PswRet() e, como alternativa, PswName().
 @type method
@@ -452,11 +452,11 @@ Return .T.
 /*/{Protheus.doc} FechaSeValido
 Fecha o diálogo de confirmação somente quando a validação dos campos
 foi bem sucedida, mantendo a tela aberta para o usuário corrigir os
-dados em caso de falha (mesmo comportamento do CI02A001/MT410TOK).
+dados em caso de falha (mesmo comportamento do CI02A01/MT410TOK).
 @type method
 @author Pablo Regis
 @since 16/09/2026
-@param oDlg, object, "Diálogo de confirmação (objeto clássico retornado por @ .. DIALOG, igual ao _oTela do CI02A001)"
+@param oDlg, object, "Diálogo de confirmação (objeto clássico retornado por @ .. DIALOG, igual ao _oTela do CI02A01)"
 @param lValido, logical, ".T. fecha o diálogo"
 @return logical, "o próprio valor de lValido recebido"
 /*/
@@ -509,7 +509,7 @@ Return lRet
 Valida a obrigatoriedade da Justificativa, a Senha de login e a Chave
 de autorização antes de permitir o fechamento do diálogo clássico de
 Assinatura Eletrônica montado em ZZ1AssinaEletronica:Confirma().
-Equivalente ao fConfirmaCICO() do CI02A001.tlpp: existe como Static
+Equivalente ao fConfirmaCICO() do CI02A01.tlpp: existe como Static
 Function (fora da classe) porque o BMPBUTTON clássico só aceita uma
 chamada de função simples em ACTION, e aciona a instância da classe
 guardada na Private _oSelfAssEle.

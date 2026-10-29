@@ -30,7 +30,7 @@ registro de auditoria por item alterado, numa unica leva. O fluxo de
 Assinatura Eletronica (tela, validacoes de senha/chave e gravacao do
 registro de auditoria na tabela ZZ1 via U_ZZ1GravaLog()) e delegado a
 classe generica ZZ1AssinaEletronica (ver ZZ1U002.tlpp), que reaproveita o
-motor generico de auditoria ja usado por A010TOK e CI02A001 (ver
+motor generico de auditoria ja usado por A010TOK e CI02A01 (ver
 ZZ1U001.tlpp).
 
 Substitui a implementação anterior "WM410LINE", que usava um nome de Ponto
@@ -76,7 +76,7 @@ User Function MT410TOK() as Logical
 		// em MT410TKAssinaLote/GravaLog) pode ter sido interrompida no meio,
 		// deixando itens sem log e o usuário sem nenhum aviso.
 		FWLogMsg("ERROR", , "MT410TOK", "MT410TOK", , "01", oError:Description, 0, 0, {})
-		MsgStop("Falha ao validar a alteracao de Lote de Controle: " + oError:Description + CHR(13) + "As alteracoes nao serao gravadas.", "MT410TOK")
+		MsgStop("Falha ao validar a alteração de Lote de Controle: " + oError:Description + CHR(13) + "As alterações não serão gravadas.", "MT410TOK")
 		lRet := .F.
 	EndTry
 
@@ -302,7 +302,7 @@ todos como autorizados na sessao corrente (aMT410TKVal), numa unica
 leva. Delega o fluxo completo (tela, validacoes e gravacao do log de
 auditoria na tabela ZZ1) para a classe generica ZZ1AssinaEletronica
 (ver ZZ1U002.tlpp), que reaproveita o mesmo padrao ja usado por este PE
-e por CI02A001.tlpp.
+e por CI02A01.tlpp.
 @type function
 @author Pablo Regis
 @since 15/09/2026
@@ -320,7 +320,7 @@ Static Function MT410TKAssinaLote(aPendentes as Array) as Logical
 	cChavePed := xFilial("SC6") + SC5->C5_NUM
 
 	oAssEle := ZZ1AssinaEletronica():New("MT410TOK", "SC6", cChavePed)
-	oAssEle:SetTitulo("Assinatura Eletronica - Alteracao de Lote de Controle")
+	oAssEle:SetTitulo("Assinatura Eletrônica - Alteração de Lote de Controle")
 	oAssEle:SetParamChave("FS_MT410TK", "123456")
 
 	For nI := 1 To Len(aPendentes)

@@ -7,7 +7,7 @@
 Classe de Assinatura Eletrônica (Justificativa + Senha de login) para
 confirmar a Assinatura Transferência entre Armazens/Depositos (MATA261), com
 gravacao automatica do log de auditoria de todos os itens transferidos
-(aCols) na tabela ZZ2 (U_ZZ2GravaLog, ver CI04A003.tlpp).
+(aCols) na tabela ZZ2 (U_ZZ2GravaLog, ver CI04A03.tlpp).
 
 Diferente da ZZ1AssinaEletronica (SIGACOM/ZZ1U002.tlpp), o layout de
 confirmação aqui NAO exibe lista de alteracoes de campo, pois toda
@@ -366,7 +366,7 @@ Return lValido
 
 /*/{Protheus.doc} GravaLog
 Percorre todos os itens em aItens e grava um registro de auditoria por
-item no log da ZZ2 via U_ZZ2GravaLog (ver CI04A003.tlpp), usando a
+item no log da ZZ2 via U_ZZ2GravaLog (ver CI04A03.tlpp), usando a
 Justificativa confirmada em Confirma()/GravaAutomatico().
 @type method
 @author Pablo Regis
