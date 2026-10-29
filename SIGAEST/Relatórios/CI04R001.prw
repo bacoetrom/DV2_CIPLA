@@ -32,7 +32,9 @@ Flags de produto controlado na SB5 (configuração padrão TOTVS dos mapas):
 Opcionais (configuração PF): MV_DESCPR (nome comercial), MV_CODMAPA (cód. SIPROQUIM).
 
 Campos customizados (SB5): B5_XCAS, B5_XFDS, B5_XANVISA, B5_XARMAZ, B5_XLIMEST.
-Campos inexistentes no dicionário são tratados como vazios (o relatório não aborta).
+Todos são opcionais: campo inexistente na SB5 é impresso como "   " e o órgão cujo
+campo não existe é ignorado no filtro, sem abortar o relatório. Se nenhum campo de
+órgão existir, a emissão segue sem o filtro por órgão fiscalizador.
 
 @type  User Function
 @author bacoetrom@gmail.com
@@ -46,6 +48,9 @@ Campos inexistentes no dicionário são tratados como vazios (o relatório não abor
 #DEFINE CPO_ANVISA   "B5_XANVISA"
 #DEFINE CPO_ARMAZ    "B5_XARMAZ"
 #DEFINE CPO_LIMEST   "B5_XLIMEST"
+
+//-- Conteúdo impresso quando o campo não existe na SB5
+#DEFINE CPO_VAZIO    "   "
 
 //-- Regras de classificação (MIT041 - seção 6). PERDAS: pendência P1 com o cliente
 #DEFINE CF_TRF_ENT   "1151/1152/1552/2151/2152/2552"
@@ -218,6 +223,7 @@ Local aOrgaos  := {}
 Local oCfg     := Nil
 Local cCondOrg := ""
 Local cErro    := ""
+Local cIgnora  := ""
 Local cFilBak  := cFilAnt
 Local oDiag    := JsonObject():New()
 Local nI       := 0
@@ -227,13 +233,21 @@ oDiag["LIDOS"    ] := 0
 oDiag["DESCART"  ] := 0
 oDiag["IMPRESSOS"] := 0
 oDiag["EXEMPLO"  ] := ""
+oDiag["ORGIGN"   ] := ""
 
 aOrgaos := fOrgaos()
 
-If !fValida(aOrgaos, @cCondOrg, @cErro)
+If !fValida(aOrgaos, @cCondOrg, @cErro, @cIgnora)
 	Help(NIL, NIL, NUM_PERG, NIL, cErro, 1, 0, NIL, NIL, NIL, NIL, NIL, {"Revise os parâmetros do relatório."})
 	oReport:CancelPrint()
 	Return
+EndIf
+
+//-- Órgãos sem campo na SB5 ficam fora do filtro (apenas registrado no diagnóstico)
+If Empty(cIgnora)
+	oDiag["ORGIGN"] := "nenhum"
+Else
+	oDiag["ORGIGN"] := cIgnora
 EndIf
 
 aSM0 := FWLoadSM0()
@@ -276,6 +290,7 @@ If oDiag["IMPRESSOS"] == 0 .And. !oReport:Cancel()
 	     "Registros lidos nas consultas: " + cValToChar(oDiag["LIDOS"]) + CRLF + ;
 	     "Descartados (sem saldo e sem movimento): " + cValToChar(oDiag["DESCART"]) + CRLF + ;
 	     "Exemplo descartado: " + oDiag["EXEMPLO"] + CRLF + ;
+	     "Órgãos fora do filtro (campo inexistente na SB5): " + oDiag["ORGIGN"] + CRLF + ;
 	     "Filtro de órgãos: " + cCondOrg, ;
 	     1, 0, NIL, NIL, NIL, NIL, NIL, {"Revise os parâmetros e o cadastro dos produtos controlados."})
 EndIf
@@ -289,8 +304,17 @@ Return
 
 /*/{Protheus.doc} fValida
 Validação dos filtros obrigatórios (fluxo alternativo A1) e montagem da condição de órgãos.
+Órgãos cujo campo não existe na SB5 são ignorados no filtro, sem abortar o relatório.
+@type  Static Function
+@author bacoetrom@gmail.com
+@since  21/10/2026
+@param aOrgaos, array, array de órgãos (fOrgaos)
+@param cCondOrg, character, retorna a condição SQL dos órgãos (por referência)
+@param cErro, character, retorna a mensagem de erro (por referência)
+@param cIgnora, character, retorna os órgãos ignorados por falta de campo na SB5 (por referência)
+@return logical, .T. se os parâmetros são válidos
 /*/
-Static Function fValida(aOrgaos, cCondOrg, cErro)
+Static Function fValida(aOrgaos, cCondOrg, cErro, cIgnora)
 
 Local cOrg   := fOrgSel()
 Local aCond  := {}
@@ -353,10 +377,12 @@ For nI := 1 To Len(cOrg) Step 2
 			cErro := "Código de órgão inválido: " + cCod + "."
 			lRet  := .F.
 		ElseIf Empty(aOrgaos[nPos][ORG_CAMPO])
-			cErro := "Órgão " + aOrgaos[nPos][ORG_DESC] + " não configurado" + ;
-			         If(Empty(aOrgaos[nPos][ORG_PARAM]), " (campo " + CPO_ANVISA + " inexistente na SB5).", ;
-			            " (parâmetro " + aOrgaos[nPos][ORG_PARAM] + " vazio ou campo inexistente na SB5).")
-			lRet  := .F.
+			//-- Campo inexistente na SB5 (ou parâmetro vazio): o órgão sai do filtro
+			If Empty(cIgnora)
+				cIgnora := aOrgaos[nPos][ORG_DESC]
+			Else
+				cIgnora += ", " + aOrgaos[nPos][ORG_DESC]
+			EndIf
 		Else
 			aAdd(aCond, fCondOrg(aOrgaos[nPos], .T.))
 		EndIf
@@ -364,7 +390,12 @@ For nI := 1 To Len(cOrg) Step 2
 Next nI
 
 If lRet
-	cCondOrg := "(" + fJunta(aCond, " OR ") + ")"
+	If Empty(aCond)
+		//-- Nenhum campo de órgão existe na SB5: emite sem o filtro por órgão
+		cCondOrg := "(1 = 1)"
+	Else
+		cCondOrg := "(" + fJunta(aCond, " OR ") + ")"
+	EndIf
 EndIf
 
 Return lRet
@@ -624,17 +655,25 @@ oItem["NOMECOM" ] := fCpoSB5(oCfg["DESCPR"], "")
 If Empty(oItem["NOMECOM"])
 	oItem["NOMECOM"] := (cAlias)->DESCRI
 EndIf
-oItem["NOMEQUI" ] := fCpoSB5("B5_CEME", "")
-oItem["CAS"     ] := fCpoSB5(CPO_CAS, "")
-oItem["CODMAPA" ] := fCpoSB5(oCfg["CODMAPA"], "")
+oItem["NOMEQUI" ] := fCpoSB5("B5_CEME", CPO_VAZIO)
+oItem["CAS"     ] := fCpoSB5(CPO_CAS, CPO_VAZIO)
+oItem["CODMAPA" ] := fCpoSB5(oCfg["CODMAPA"], CPO_VAZIO)
 cEstMat := fCpoSB5("B5_ESTMAT", "")
-oItem["FORMA"   ] := If(Empty(cEstMat), "", X3Combo("B5_ESTMAT", cEstMat))
+If Empty(cEstMat)
+	oItem["FORMA"   ] := CPO_VAZIO
+Else
+	oItem["FORMA"   ] := X3Combo("B5_ESTMAT", cEstMat)
+EndIf
 oItem["UM"      ] := (cAlias)->UM
 oItem["ORGAO"   ] := fDescOrg(aOrgaos)
 xLimite := fCpoSB5(CPO_LIMEST, Nil)
-oItem["LIMEST"  ] := If(ValType(xLimite) == "N" .And. xLimite > 0, xLimite, (cAlias)->EMAX)
-oItem["FDS"     ] := fCpoSB5(CPO_FDS, "")
-oItem["ARMAZEN" ] := fCpoSB5(CPO_ARMAZ, "")
+If ValType(xLimite) == "N" .And. xLimite > 0
+	oItem["LIMEST"  ] := xLimite
+Else
+	oItem["LIMEST"  ] := (cAlias)->EMAX
+EndIf
+oItem["FDS"     ] := fCpoSB5(CPO_FDS, CPO_VAZIO)
+oItem["ARMAZEN" ] := fCpoSB5(CPO_ARMAZ, CPO_VAZIO)
 oItem["ARMAZEM" ] := cLocal
 
 If lLote
@@ -825,15 +864,19 @@ Return cRet
 
 /*/{Protheus.doc} fDescOrg
 Órgãos que controlam o produto posicionado na SB5 (flag = 'S' ou campo preenchido).
+Retorna CPO_VAZIO quando nenhum campo de órgão existe na SB5.
 /*/
 Static Function fDescOrg(aOrgaos)
 
-Local aDesc := {}
+Local aDesc     := {}
 Local cConteudo := ""
-Local nI    := 0
+Local cRet      := ""
+Local nI        := 0
+Local lCampo    := .F.
 
 For nI := 1 To Len(aOrgaos)
 	If !Empty(aOrgaos[nI][ORG_CAMPO])
+		lCampo    := .T.
 		cConteudo := fCpoSB5(aOrgaos[nI][ORG_CAMPO], "")
 		If (aOrgaos[nI][ORG_PREENCH] .And. !Empty(cConteudo)) .Or. (!aOrgaos[nI][ORG_PREENCH] .And. cConteudo == "S")
 			aAdd(aDesc, aOrgaos[nI][ORG_COD])
@@ -841,7 +884,16 @@ For nI := 1 To Len(aOrgaos)
 	EndIf
 Next nI
 
-Return If(Empty(aDesc), "NAO CONTROLADO", fJunta(aDesc, " / "))
+If !lCampo
+	//-- Sem campo de órgão na SB5: não há como classificar o produto
+	cRet := CPO_VAZIO
+ElseIf Empty(aDesc)
+	cRet := "NAO CONTROLADO"
+Else
+	cRet := fJunta(aDesc, " / ")
+EndIf
+
+Return cRet
 
 /*/{Protheus.doc} fConfig
 Campos opcionais da configuração PF (nome comercial e código SIPROQUIM).
@@ -872,7 +924,7 @@ Retorna o nome do campo se existir na SB5 (lValida) ou vazio.
 /*/
 Static Function fCampoSB5(cCampo, lValida)
 
-If !lValida .Or. Empty(cCampo) .Or. SB5->(FieldPos(cCampo)) == 0
+If !lValida .Or. Empty(cCampo) .Or. Select("SB5") == 0 .Or. SB5->(FieldPos(cCampo)) == 0
 	cCampo := ""
 EndIf
 
@@ -886,7 +938,7 @@ Static Function fCpoSB5(cCampo, xDefault)
 Local xRet := xDefault
 Local nPos := 0
 
-If !Empty(cCampo)
+If !Empty(cCampo) .And. Select("SB5") > 0
 	nPos := SB5->(FieldPos(cCampo))
 	If nPos > 0 .And. !SB5->(Eof())
 		xRet := SB5->(FieldGet(nPos))
