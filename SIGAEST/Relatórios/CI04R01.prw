@@ -22,8 +22,12 @@ Parâmetros (ParamBox - não depende de SX1; respostas salvas no perfil do usuário
   MV_PAR08 Produto/Reagente até     C  tam. B1_COD   F3 SB1
   MV_PAR09 Validade de              D
   MV_PAR10 Validade até             D
-  MV_PAR11 a MV_PAR15 Órgãos fiscalizadores (checkbox): Polícia Civil, Polícia Federal,
-           Exército, ANVISA, Não Controlado
+  MV_PAR11 Órgãos Fiscalizadores    C  seleção múltipla via f_Opcoes (tela "Escolha Padrões"):
+           Polícia Civil, Polícia Federal, Exército, ANVISA, as 12 listas da Portaria
+           SVS/MS 344/98 (A1, A2, A3, B1, B2, C1 a C5, D1, D2) e Não Controlado. O conteúdo
+           é a concatenação dos códigos de 2 posições, com "**" nas opções não marcadas
+           (ex.: "PF**EX" + Replicate("*", 28) = Polícia Federal + Exército)
+           Padrão: os 4 órgãos marcados; listas e "não controlado" desmarcados
 
 Flags de produto controlado na SB5 (configuração padrão TOTVS dos mapas):
   MV_PRODPF  -> campo da Polícia Federal  (ex.: B5_PRODPF)   - MATA950/MATR913
@@ -31,10 +35,13 @@ Flags de produto controlado na SB5 (configuração padrão TOTVS dos mapas):
   MV_MTR947A -> campo da Polícia Civil    (ex.: B5_PRODCON)  - MATR947
 Opcionais (configuração PF): MV_DESCPR (nome comercial), MV_CODMAPA (cód. SIPROQUIM).
 
-Campos customizados (SB5): B5_XCAS, B5_XFDS, B5_XANVISA, B5_XARMAZ, B5_XLIMEST.
-Todos são opcionais: campo inexistente na SB5 é impresso como "   " e o órgão cujo
-campo não existe é ignorado no filtro, sem abortar o relatório. Se nenhum campo de
-órgão existir, a emissão segue sem o filtro por órgão fiscalizador.
+Campos customizados (SB5): B5_XCAS, B5_XFDS, B5_XANVISA, B5_XARMAZ, B5_XLIMEST e
+B5_XLISTA (lista da Portaria SVS/MS 344/98, C 2: "A1".."D2").
+Todos são opcionais: campo inexistente na SB5 é impresso como "   ". No filtro, a
+opção cujo campo não existe é ignorada e registrada no diagnóstico - o resultado
+fica mais restrito, nunca mais abrangente. Mas se NENHUMA opção marcada tiver campo
+na SB5, a emissão é bloqueada: sem condição de órgão o relatório listaria todo o
+estoque como se fosse controlado.
 
 @type  User Function
 @author bacoetrom@gmail.com
@@ -49,6 +56,11 @@ campo não existe é ignorado no filtro, sem abortar o relatório. Se nenhum campo 
 #DEFINE CPO_ARMAZ    "B5_XARMAZ"
 #DEFINE CPO_LIMEST   "B5_XLIMEST"
 
+//-- Lista da Portaria SVS/MS 344/98 do produto (C 2: "A1".."D2"). O nome do campo pode
+//-- ser trocado pelo parâmetro PAR_LISTA, como nos demais órgãos
+#DEFINE CPO_LISTA    "B5_XLISTA"
+#DEFINE PAR_LISTA    "MV_XLISANV"
+
 //-- Conteúdo impresso quando o campo não existe na SB5
 #DEFINE CPO_VAZIO    "   "
 
@@ -58,10 +70,11 @@ campo não existe é ignorado no filtro, sem abortar o relatório. Se nenhum campo 
 #DEFINE D3_CF_TRANSF "RE4/DE4/RE7/DE7"
 #DEFINE TM_PERDAS    "499/999"
 
-//-- Órgãos fiscalizadores (códigos de 2 posições, na ordem dos checkboxes MV_PAR11..MV_PAR15)
-#DEFINE ORG_CODIGOS  "PCPFEXAVNC"
-#DEFINE PAR_ORG_INI  11
-#DEFINE QTD_PARAM    15
+//-- Órgãos fiscalizadores: seleção múltipla (f_Opcoes) na pergunta MV_PAR11
+#DEFINE ORG_TAM      2      //-- posições do código de cada órgão
+#DEFINE ORG_NC       "NC"   //-- "não controlado": opção de filtro, não é um órgão
+#DEFINE PAR_ORG      11
+#DEFINE QTD_PARAM    11
 #DEFINE MAX_DIAS     4095
 #DEFINE NUM_PERG     "CI04R01"
 
@@ -71,6 +84,8 @@ campo não existe é ignorado no filtro, sem abortar o relatório. Se nenhum campo 
 #DEFINE ORG_CAMPO    3
 #DEFINE ORG_PARAM    4
 #DEFINE ORG_PREENCH  5   //-- .T.: controlado quando o campo está preenchido (ex.: registro ANVISA); .F.: flag = 'S'
+#DEFINE ORG_CONTEU   6   //-- preenchido: controlado quando o campo tem este conteúdo (listas da 344/98).
+                         //-- Também identifica a opção como sublista, que não vem marcada por padrão
 
 /*/{Protheus.doc} CI04R01
 Ponto de entrada do relatório.
@@ -80,7 +95,7 @@ User Function CI04R01()
 Local oReport
 
 Private mv_par01, mv_par02, mv_par03, mv_par04, mv_par05, mv_par06, mv_par07, mv_par08
-Private mv_par09, mv_par10, mv_par11, mv_par12, mv_par13, mv_par14, mv_par15
+Private mv_par09, mv_par10, mv_par11
 
 If !fParams()
 	Return
@@ -118,11 +133,8 @@ aAdd(aPergs, {1, "Produto/Reagente de" , Space(nTamPrd)          , "@!", "", "SB
 aAdd(aPergs, {1, "Produto/Reagente até", Replicate("Z", nTamPrd) , "@!", "", "SB1", "", 80, .T.})
 aAdd(aPergs, {1, "Validade de"         , StoD("19000101")        , ""  , "", ""   , "", 50, .T.})
 aAdd(aPergs, {1, "Validade até"        , StoD("29991231")        , ""  , "", ""   , "", 50, .T.})
-aAdd(aPergs, {5, "Órgão: Polícia Civil"   , .T., 120, "", .F.})
-aAdd(aPergs, {5, "Órgão: Polícia Federal" , .T., 120, "", .F.})
-aAdd(aPergs, {5, "Órgão: Exército"        , .T., 120, "", .F.})
-aAdd(aPergs, {5, "Órgão: ANVISA"          , .T., 120, "", .F.})
-aAdd(aPergs, {5, "Não Controlado"         , .F., 120, "", .F.})
+//-- Seleção múltipla pelo f_Opcoes: a validação da pergunta abre a tela de opções
+aAdd(aPergs, {1, "Órgãos Fiscalizadores", fOrgDef(), "@!", "U_CI04ORG()", "", "", 100, .T.})
 
 If ParamBox(aPergs, "Parâmetros - Reagentes Controlados", @aRet, , , .T., , , , NUM_PERG, .T., .T.)
 	For nI := 1 To QTD_PARAM
@@ -132,6 +144,56 @@ If ParamBox(aPergs, "Parâmetros - Reagentes Controlados", @aRet, , , .T., , , , 
 EndIf
 
 FwFreeArray(aPergs)
+
+Return lRet
+
+/*/{Protheus.doc} CI04ORG
+Validação da pergunta MV_PAR11: abre a seleção múltipla dos órgãos fiscalizadores
+com o f_Opcoes (tela padrão "Escolha Padrões") e grava os códigos marcados na
+pergunta.
+
+O ParamBox macro-executa o conteúdo da validação, por isso esta rotina precisa ser
+User Function (uma Static Function não é visível para o compilador de macros). O
+ParamBox informa o nome da variável da pergunta ao TGet (cReadVar), de modo que
+ReadVar() devolve "MV_PAR11" durante a validação.
+
+@type  User Function
+@author bacoetrom@gmail.com
+@since  05/11/2026
+@return logical, .T. se ao menos um órgão ficou marcado
+/*/
+User Function CI04ORG()
+
+Local aOpcoes  := {}
+Local cCodigos := ""
+Local cVar     := AllTrim(ReadVar())
+Local cSel     := ""
+Local lRet     := .F.
+
+//-- Fora do contexto do get (ReadVar vazio) a pergunta é endereçada pelo nome
+If Empty(cVar)
+	cVar := "MV_PAR" + StrZero(PAR_ORG, 2)
+EndIf
+
+aOpcoes := fOrgOpc(@cCodigos)
+
+//-- Conteúdo atual: o f_Opcoes marca as opções já presentes na variável
+If Type(cVar) == "C"
+	cSel := &(cVar)
+EndIf
+
+If f_Opcoes(@cSel, "Órgãos Fiscalizadores", aOpcoes, cCodigos, , , .F., ORG_TAM, Len(aOpcoes))
+	&(cVar) := cSel
+EndIf
+
+lRet := !Empty(fOrgSel())
+
+If !lRet
+	Help(NIL, NIL, NUM_PERG, NIL, "Selecione ao menos um órgão fiscalizador.", 1, 0, NIL, NIL, NIL, NIL, NIL, ;
+	     {"Marque uma das opções na tela de seleção."})
+EndIf
+
+FwFreeArray(aOpcoes)
 
 Return lRet
 
@@ -158,48 +220,48 @@ oSecao:SetTotalInLine(.F.)
 oSecao:SetHeaderPage(.T.)
 
 //-- Identificação
-TRCell():New(oSecao, "FILIAL"  , "", "Filial"          + CRLF + "Branch"         , "@!", FWSizeFilial())
-TRCell():New(oSecao, "PRODUTO" , "", "Código"          + CRLF + "Code"           , "@!", TamSX3("B1_COD")[1])
-TRCell():New(oSecao, "NOMECOM" , "", "Nome Comercial"  + CRLF + "Trade Name"     , "@!", 30)
-TRCell():New(oSecao, "NOMEQUI" , "", "Nome Químico"    + CRLF + "Chemical Name"  , "@!", 30)
-TRCell():New(oSecao, "CAS"     , "", "Nº CAS"          + CRLF + "CAS Number"     , "@!", 12)
-TRCell():New(oSecao, "CODMAPA" , "", "Cód. SIPROQUIM"  + CRLF + "SIPROQUIM Code" , "@!", 11)
-TRCell():New(oSecao, "FORMA"   , "", "Forma"           + CRLF + "Physical Form"  , "@!", 10)
-TRCell():New(oSecao, "UM"      , "", "UM"              + CRLF + "UoM"            , "@!", TamSX3("B1_UM")[1])
+TRCell():New(oSecao, "FILIAL"  , "", "Filial"          + "/" + "Branch"         , "@!", FWSizeFilial())
+TRCell():New(oSecao, "PRODUTO" , "", "Código"          + "/" + "Code"           , "@!", TamSX3("B1_COD")[1])
+TRCell():New(oSecao, "NOMECOM" , "", "Nome Comercial"  + "/" + "Trade Name"     , "@!", 30)
+TRCell():New(oSecao, "NOMEQUI" , "", "Nome Químico"    + "/" + "Chemical Name"  , "@!", 30)
+TRCell():New(oSecao, "CAS"     , "", "Nº CAS"          + "/" + "CAS Number"     , "@!", 12)
+TRCell():New(oSecao, "CODMAPA" , "", "Cód. SIPROQUIM"  + "/" + "SIPROQUIM Code" , "@!", 11)
+TRCell():New(oSecao, "FORMA"   , "", "Forma"           + "/" + "Physical Form"  , "@!", 10)
+TRCell():New(oSecao, "UM"      , "", "UM"              + "/" + "UoM"            , "@!", TamSX3("B1_UM")[1])
 
 //-- Regulatório
-TRCell():New(oSecao, "ORGAO"   , "", "Órgão Fiscaliz." + CRLF + "Regulatory Agency", "@!", 20)
-TRCell():New(oSecao, "LIMEST"  , "", "Limite Estoque"  + CRLF + "Stock Limit"    , cPictQtd, nTamQtd, , , "RIGHT", , "RIGHT")
-TRCell():New(oSecao, "FDS"     , "", "FDS"             + CRLF + "SDS"            , "@!", 20)
-TRCell():New(oSecao, "ARMAZEN" , "", "Armazenamento"   + CRLF + "Storage"        , "@!", 20)
+TRCell():New(oSecao, "ORGAO"   , "", "Órgão Fiscaliz." + "/" + "Regulatory Agency", "@!", 30)
+TRCell():New(oSecao, "LIMEST"  , "", "Limite Estoque"  + "/" + "Stock Limit"    , cPictQtd, nTamQtd, , , "RIGHT", , "RIGHT")
+TRCell():New(oSecao, "FDS"     , "", "FDS"             + "/" + "SDS"            , "@!", 20)
+TRCell():New(oSecao, "ARMAZEN" , "", "Armazenamento"   + "/" + "Storage"        , "@!", 20)
 
 //-- Lote
-TRCell():New(oSecao, "ARMAZEM" , "", "Armazém"         + CRLF + "Warehouse"      , "@!", TamSX3("B8_LOCAL")[1])
-TRCell():New(oSecao, "LOTE"    , "", "Lote"            + CRLF + "Batch"          , "@!", TamSX3("B8_LOTECTL")[1])
-TRCell():New(oSecao, "SUBLOTE" , "", "Sub-Lote"        + CRLF + "Sub-Batch"      , "@!", TamSX3("B8_NUMLOTE")[1])
-TRCell():New(oSecao, "LOTEFOR" , "", "Lote Fabric."    + CRLF + "Mfr. Batch"     , "@!", TamSX3("B8_LOTEFOR")[1])
-TRCell():New(oSecao, "FABRIC"  , "", "Fabricante"      + CRLF + "Manufacturer"   , "@!", 30)
-TRCell():New(oSecao, "DTFABRIC", "", "Dt. Fabricação"  + CRLF + "Mfg. Date"      , "@D", 10)
-TRCell():New(oSecao, "DTVALID" , "", "Dt. Validade"    + CRLF + "Expiry Date"    , "@D", 10)
+TRCell():New(oSecao, "ARMAZEM" , "", "Armazém"         + "/" + "Warehouse"      , "@!", TamSX3("B8_LOCAL")[1])
+TRCell():New(oSecao, "LOTE"    , "", "Lote"            + "/" + "Batch"          , "@!", TamSX3("B8_LOTECTL")[1])
+TRCell():New(oSecao, "SUBLOTE" , "", "Sub-Lote"        + "/" + "Sub-Batch"      , "@!", TamSX3("B8_NUMLOTE")[1])
+TRCell():New(oSecao, "LOTEFOR" , "", "Lote Fabric."    + "/" + "Mfr. Batch"     , "@!", TamSX3("B8_LOTEFOR")[1])
+TRCell():New(oSecao, "FABRIC"  , "", "Fabricante"      + "/" + "Manufacturer"   , "@!", 30)
+TRCell():New(oSecao, "DTFABRIC", "", "Dt. Fabricação"  + "/" + "Mfg. Date"      , "@D", 10)
+TRCell():New(oSecao, "DTVALID" , "", "Dt. Validade"    + "/" + "Expiry Date"    , "@D", 10)
 
 //-- Nota fiscal de compra
-TRCell():New(oSecao, "NFDOC"   , "", "NF Compra"       + CRLF + "Purchase Inv."  , "@!", TamSX3("B8_DOC")[1])
-TRCell():New(oSecao, "NFSERIE" , "", "Série"           + CRLF + "Series"         , "@!", TamSX3("B8_SERIE")[1])
-TRCell():New(oSecao, "NFEMIS"  , "", "Emissão NF"      + CRLF + "Inv. Date"      , "@D", 10)
+TRCell():New(oSecao, "NFDOC"   , "", "NF Compra"       + "/" + "Purchase Inv."  , "@!", TamSX3("B8_DOC")[1])
+TRCell():New(oSecao, "NFSERIE" , "", "Série"           + "/" + "Series"         , "@!", TamSX3("B8_SERIE")[1])
+TRCell():New(oSecao, "NFEMIS"  , "", "Emissão NF"      + "/" + "Inv. Date"      , "@D", 10)
 
 //-- Balanço do período
-TRCell():New(oSecao, "SLDINI"  , "", "Saldo Inicial"   + CRLF + "Opening Balance", cPictQtd, nTamQtd, , , "RIGHT", , "RIGHT")
-TRCell():New(oSecao, "COMPRAS" , "", "Compras"         + CRLF + "Purchases"      , cPictQtd, nTamQtd, , , "RIGHT", , "RIGHT")
-TRCell():New(oSecao, "CONSUMO" , "", "Consumo"         + CRLF + "Consumption"    , cPictQtd, nTamQtd, , , "RIGHT", , "RIGHT")
-TRCell():New(oSecao, "PERDAS"  , "", "Perdas/Transf."  + CRLF + "Losses/Transfers", cPictQtd, nTamQtd, , , "RIGHT", , "RIGHT")
-TRCell():New(oSecao, "SLDFIM"  , "", "Saldo Final"     + CRLF + "Closing Balance", cPictQtd, nTamQtd, , , "RIGHT", , "RIGHT")
-TRCell():New(oSecao, "SLDSIS"  , "", "Saldo Sistema"   + CRLF + "System Balance" , cPictQtd, nTamQtd, , , "RIGHT", , "RIGHT")
-TRCell():New(oSecao, "CONFERE" , "", "Conferência"     + CRLF + "Check"          , "@!", 10)
+TRCell():New(oSecao, "SLDINI"  , "", "Saldo Inicial"   + "/" + "Opening Balance", cPictQtd, nTamQtd, , , "RIGHT", , "RIGHT")
+TRCell():New(oSecao, "COMPRAS" , "", "Compras"         + "/" + "Purchases"      , cPictQtd, nTamQtd, , , "RIGHT", , "RIGHT")
+TRCell():New(oSecao, "CONSUMO" , "", "Consumo"         + "/" + "Consumption"    , cPictQtd, nTamQtd, , , "RIGHT", , "RIGHT")
+TRCell():New(oSecao, "PERDAS"  , "", "Perdas/Transf."  + "/" + "Losses/Transfers", cPictQtd, nTamQtd, , , "RIGHT", , "RIGHT")
+TRCell():New(oSecao, "SLDFIM"  , "", "Saldo Final"     + "/" + "Closing Balance", cPictQtd, nTamQtd, , , "RIGHT", , "RIGHT")
+TRCell():New(oSecao, "SLDSIS"  , "", "Saldo Sistema"   + "/" + "System Balance" , cPictQtd, nTamQtd, , , "RIGHT", , "RIGHT")
+TRCell():New(oSecao, "CONFERE" , "", "Conferência"     + "/" + "Check"          , "@!", 10)
 
 //-- Responsabilidade (preenchimento manual)
-TRCell():New(oSecao, "RESP"    , "", "Responsável"     + CRLF + "Responsible"    , "@!", 15)
-TRCell():New(oSecao, "CONFER"  , "", "Conferente"      + CRLF + "Checked by"     , "@!", 15)
-TRCell():New(oSecao, "OBS"     , "", "Observações"     + CRLF + "Remarks"        , "@!", 20)
+TRCell():New(oSecao, "RESP"    , "", "Responsável"     + "/" + "Responsible"    , "@!", 15)
+TRCell():New(oSecao, "CONFER"  , "", "Conferente"      + "/" + "Checked by"     , "@!", 15)
+TRCell():New(oSecao, "OBS"     , "", "Observações"     + "/" + "Remarks"        , "@!", 20)
 
 //-- Totais por produto (unidades diferentes entre produtos: sem total geral)
 oBreak := TRBreak():New(oSecao, oSecao:Cell("PRODUTO"), "Total do produto / Product total", .F.)
@@ -305,6 +367,8 @@ Return
 /*/{Protheus.doc} fValida
 Validação dos filtros obrigatórios (fluxo alternativo A1) e montagem da condição de órgãos.
 Órgãos cujo campo não existe na SB5 são ignorados no filtro, sem abortar o relatório.
+Se nenhuma opção marcada tiver campo na SB5, aborta: a condição vazia equivaleria a
+"1 = 1" e o relatório traria todo o estoque sem filtro de órgão.
 @type  Static Function
 @author bacoetrom@gmail.com
 @since  21/10/2026
@@ -354,12 +418,12 @@ EndCase
 lRet := Empty(cErro)
 
 //-- Condição SQL dos órgãos marcados (unidos por OR)
-For nI := 1 To Len(cOrg) Step 2
+For nI := 1 To Len(cOrg) Step ORG_TAM
 	If !lRet
 		Exit
 	EndIf
-	cCod := SubStr(cOrg, nI, 2)
-	If cCod == "NC"
+	cCod := SubStr(cOrg, nI, ORG_TAM)
+	If cCod == ORG_NC
 		//-- Não controlado: nenhum dos órgãos configurados se aplica ao produto
 		For nPos := 1 To Len(aOrgaos)
 			If !Empty(aOrgaos[nPos][ORG_CAMPO])
@@ -367,7 +431,11 @@ For nI := 1 To Len(cOrg) Step 2
 			EndIf
 		Next nPos
 		If Empty(aNC)
-			aAdd(aCond, "1 = 1")
+			//-- Sem nenhum campo de órgão não há como saber o que NÃO é controlado:
+			//-- "1 = 1" traria todo o estoque como se fosse não controlado
+			cErro := "Não há campo de órgão fiscalizador configurado na SB5, então não é " + ;
+			         "possível identificar os produtos não controlados."
+			lRet  := .F.
 		Else
 			aAdd(aCond, "(" + fJunta(aNC, " AND ") + ")")
 		EndIf
@@ -391,8 +459,12 @@ Next nI
 
 If lRet
 	If Empty(aCond)
-		//-- Nenhum campo de órgão existe na SB5: emite sem o filtro por órgão
-		cCondOrg := "(1 = 1)"
+		//-- Nenhuma opção marcada tem campo na SB5. Emitir com "1 = 1" traria todo o
+		//-- estoque como se fosse controlado, o que é inaceitável num relatório
+		//-- regulatório: bloqueia e informa o que falta configurar
+		cErro := "Nenhuma das opções marcadas tem campo correspondente na SB5: " + cIgnora + "." + CRLF + ;
+		         "Sem isso o relatório listaria todo o estoque sem filtrar por órgão."
+		lRet  := .F.
 	Else
 		cCondOrg := "(" + fJunta(aCond, " OR ") + ")"
 	EndIf
@@ -819,18 +891,76 @@ Return
 
 /*/{Protheus.doc} fOrgaos
 Órgãos fiscalizadores: código, descrição, campo na SB5, parâmetro de origem e regra
-(flag = 'S' ou campo preenchido).
+(flag = 'S', campo preenchido ou conteúdo igual ao código da lista).
+Os 4 primeiros são os órgãos propriamente ditos; em seguida vêm as 12 listas da
+Portaria 344/98, todas no mesmo campo (fCampoLis) e diferenciadas pelo conteúdo.
 /*/
 Static Function fOrgaos()
 
 Local aOrgaos := {}
+Local aListas := fListAnv()
+Local cCpoLis := fCampoLis()
+Local nI      := 0
 
-aAdd(aOrgaos, {"PC", "POLÍCIA CIVIL"  , fCampoMV("MV_MTR947A")      , "MV_MTR947A", .F.})
-aAdd(aOrgaos, {"PF", "POLÍCIA FEDERAL", fCampoMV("MV_PRODPF")       , "MV_PRODPF" , .F.})
-aAdd(aOrgaos, {"EX", "EXÉRCITO"       , fCampoMV("MV_MTR949A")      , "MV_MTR949A", .F.})
-aAdd(aOrgaos, {"AV", "ANVISA"         , fCampoSB5(CPO_ANVISA, .T.)  , ""          , .T.})   //-- registro ANVISA: preenchido = controlado
+aAdd(aOrgaos, {"PC", "POLÍCIA CIVIL"  , fCampoMV("MV_MTR947A")      , "MV_MTR947A", .F., ""})
+aAdd(aOrgaos, {"PF", "POLÍCIA FEDERAL", fCampoMV("MV_PRODPF")       , "MV_PRODPF" , .F., ""})
+aAdd(aOrgaos, {"EX", "EXÉRCITO"       , fCampoMV("MV_MTR949A")      , "MV_MTR949A", .F., ""})
+aAdd(aOrgaos, {"AV", "ANVISA"         , fCampoSB5(CPO_ANVISA, .T.)  , ""          , .T., ""})   //-- registro ANVISA: preenchido = controlado
+
+//-- Listas da Portaria SVS/MS 344/98: todas no mesmo campo, diferenciadas pelo conteúdo
+For nI := 1 To Len(aListas)
+	aAdd(aOrgaos, {aListas[nI][1], aListas[nI][2], cCpoLis, PAR_LISTA, .F., aListas[nI][1]})
+Next nI
+
+FwFreeArray(aListas)
 
 Return aOrgaos
+
+/*/{Protheus.doc} fListAnv
+Listas de substâncias sujeitas a controle especial da Portaria SVS/MS 344/98
+(Anexo I), na ordem em que aparecem na seleção de órgãos.
+A3 e B1 compartilham a descrição "PSICOTRÓPICOS" por definição da própria Portaria;
+o código exibido ao lado da descrição diferencia as duas opções.
+@type  Static Function
+@author bacoetrom@gmail.com
+@since  05/11/2026
+@return array, pares {código de 2 posições, descrição}
+/*/
+Static Function fListAnv()
+
+Local aListas := {}
+
+aAdd(aListas, {"A1", "ANVISA - ENTORPECENTES"})
+aAdd(aListas, {"A2", "ANVISA - ENTORPECENTES DE USO EM CONCENTRAÇÕES ESPECIAIS"})
+aAdd(aListas, {"A3", "ANVISA - PSICOTRÓPICOS"})
+aAdd(aListas, {"B1", "ANVISA - PSICOTRÓPICOS"})
+aAdd(aListas, {"B2", "ANVISA - PSICOTRÓPICOS ANOREXÍGENOS"})
+aAdd(aListas, {"C1", "ANVISA - OUTRAS SUBSTÂNCIAS SUJEITAS A CONTROLE ESPECIAL"})
+aAdd(aListas, {"C2", "ANVISA - SUBSTÂNCIAS RETINÓICAS"})
+aAdd(aListas, {"C3", "ANVISA - IMUNOSSUPRESSORES"})
+aAdd(aListas, {"C4", "ANVISA - ANTIRRETROVIRAIS"})
+aAdd(aListas, {"C5", "ANVISA - SUBSTÂNCIAS ANABOLIZANTES"})
+aAdd(aListas, {"D1", "ANVISA - PRECURSORAS"})
+aAdd(aListas, {"D2", "ANVISA - REAGENTES QUÍMICOS"})
+
+Return aListas
+
+/*/{Protheus.doc} fCampoLis
+Nome do campo da SB5 que guarda a lista da Portaria 344/98. Usa o parâmetro
+PAR_LISTA quando configurado e, na ausência dele, o campo padrão CPO_LISTA.
+Retorna vazio se o campo não existir na SB5 (as listas saem do filtro).
+@type  Static Function
+@author bacoetrom@gmail.com
+@since  05/11/2026
+@return character, nome do campo ou vazio
+/*/
+Static Function fCampoLis()
+
+Local cCampo := Upper(AllTrim(SuperGetMV(PAR_LISTA, .F., CPO_LISTA)))
+
+cCampo := StrTran(cCampo, "SB5->", "")
+
+Return fCampoSB5(cCampo, .T.)
 
 /*/{Protheus.doc} fCondOrg
 Condição SQL do órgão: produto controlado (lControla = .T.) ou não controlado (.F.) por ele.
@@ -846,24 +976,33 @@ Static Function fCondOrg(aOrg, lControla)
 Local cCampo := "COALESCE(SB5." + aOrg[ORG_CAMPO] + ",' ')"
 Local cRet   := ""
 
-If aOrg[ORG_PREENCH]
+Do Case
+Case !Empty(aOrg[ORG_CONTEU])
+	//-- Lista da 344/98: o campo guarda o código da lista
+	If lControla
+		cRet := cCampo + " = '" + aOrg[ORG_CONTEU] + "'"
+	Else
+		cRet := cCampo + " <> '" + aOrg[ORG_CONTEU] + "'"
+	EndIf
+Case aOrg[ORG_PREENCH]
 	If lControla
 		cRet := cCampo + " <> ' '"
 	Else
 		cRet := cCampo + " = ' '"
 	EndIf
-Else
+OtherWise
 	If lControla
 		cRet := cCampo + " = 'S'"
 	Else
 		cRet := cCampo + " <> 'S'"
 	EndIf
-EndIf
+EndCase
 
 Return cRet
 
 /*/{Protheus.doc} fDescOrg
-Órgãos que controlam o produto posicionado na SB5 (flag = 'S' ou campo preenchido).
+Órgãos que controlam o produto posicionado na SB5 (flag = 'S', campo preenchido ou
+conteúdo igual ao código da lista da 344/98).
 Retorna CPO_VAZIO quando nenhum campo de órgão existe na SB5.
 /*/
 Static Function fDescOrg(aOrgaos)
@@ -873,12 +1012,21 @@ Local cConteudo := ""
 Local cRet      := ""
 Local nI        := 0
 Local lCampo    := .F.
+Local lControla := .F.
 
 For nI := 1 To Len(aOrgaos)
 	If !Empty(aOrgaos[nI][ORG_CAMPO])
 		lCampo    := .T.
 		cConteudo := fCpoSB5(aOrgaos[nI][ORG_CAMPO], "")
-		If (aOrgaos[nI][ORG_PREENCH] .And. !Empty(cConteudo)) .Or. (!aOrgaos[nI][ORG_PREENCH] .And. cConteudo == "S")
+		Do Case
+		Case !Empty(aOrgaos[nI][ORG_CONTEU])
+			lControla := cConteudo == aOrgaos[nI][ORG_CONTEU]
+		Case aOrgaos[nI][ORG_PREENCH]
+			lControla := !Empty(cConteudo)
+		OtherWise
+			lControla := cConteudo == "S"
+		EndCase
+		If lControla
 			aAdd(aDesc, aOrgaos[nI][ORG_COD])
 		EndIf
 	EndIf
@@ -921,12 +1069,32 @@ Return fCampoSB5(cCampo, .T.)
 
 /*/{Protheus.doc} fCampoSB5
 Retorna o nome do campo se existir na SB5 (lValida) ou vazio.
+
+A validação roda antes do oSecao:Init() (que é quem abre as tabelas da seção), por
+isso a SB5 é aberta aqui com ChkFile() quando necessário: sem a tabela aberta o
+FieldPos() daria 0 e todos os campos de órgão seriam tratados como inexistentes.
+@type  Static Function
+@author bacoetrom@gmail.com
+@since  21/10/2026
+@param cCampo, character, nome do campo
+@param lValida, logical, .F. devolve vazio sem consultar a SB5
+@return character, nome do campo ou vazio
 /*/
 Static Function fCampoSB5(cCampo, lValida)
 
-If !lValida .Or. Empty(cCampo) .Or. Select("SB5") == 0 .Or. SB5->(FieldPos(cCampo)) == 0
+Local aArea := GetArea()
+
+Do Case
+Case !lValida .Or. Empty(cCampo)
 	cCampo := ""
-EndIf
+Case Select("SB5") == 0 .And. !ChkFile("SB5")
+	//-- SB5 indisponível no ambiente: não há como validar o campo
+	cCampo := ""
+Case SB5->(FieldPos(cCampo)) == 0
+	cCampo := ""
+EndCase
+
+RestArea(aArea)
 
 Return cCampo
 
@@ -1007,8 +1175,9 @@ Next nI
 Return cRet
 
 /*/{Protheus.doc} fOrgSel
-Códigos dos órgãos marcados nos checkboxes MV_PAR11..MV_PAR15, concatenados
-(ex.: PFEX = Polícia Federal + Exército).
+Códigos dos órgãos marcados na pergunta MV_PAR11, concatenados e sem as posições
+não marcadas (ex.: "PF**EX****" -> "PFEX"). Conteúdo inválido digitado na pergunta
+é descartado.
 @type  Static Function
 @author bacoetrom@gmail.com
 @since  21/10/2026
@@ -1016,14 +1185,115 @@ Códigos dos órgãos marcados nos checkboxes MV_PAR11..MV_PAR15, concatenados
 /*/
 Static Function fOrgSel()
 
-Local cRet := ""
-Local nI   := 0
+Local aOpcoes  := {}
+Local cCodigos := ""
+Local cPar     := ""
+Local cCod     := ""
+Local cRet     := ""
+Local nI       := 0
 
-For nI := PAR_ORG_INI To QTD_PARAM
-	If ValType(&("mv_par" + StrZero(nI, 2))) == "L" .And. &("mv_par" + StrZero(nI, 2))
-		cRet += SubStr(ORG_CODIGOS, ((nI - PAR_ORG_INI) * 2) + 1, 2)
+If Type("mv_par" + StrZero(PAR_ORG, 2)) == "C"
+	cPar := &("mv_par" + StrZero(PAR_ORG, 2))
+EndIf
+
+aOpcoes := fOrgOpc(@cCodigos)
+
+For nI := 1 To Len(cPar) Step ORG_TAM
+	cCod := SubStr(cPar, nI, ORG_TAM)
+	If fOrgPos(cCod, cCodigos) > 0
+		cRet += cCod
 	EndIf
 Next nI
 
+FwFreeArray(aOpcoes)
+
 Return cRet
+
+/*/{Protheus.doc} fOrgOpc
+Opções da seleção múltipla de órgãos fiscalizadores (f_Opcoes), no formato
+"XX - DESCRIÇÃO" exigido pela função (código com ORG_TAM posições seguido de " - ").
+"Não controlado" é sempre a última opção, pois não é um órgão: existe apenas como
+filtro para os produtos que nenhum órgão controla.
+@type  Static Function
+@author bacoetrom@gmail.com
+@since  05/11/2026
+@param cCodigos, character, retorna a concatenação dos códigos na ordem das opções (por referência)
+@return array, opções exibidas na tela do f_Opcoes
+/*/
+Static Function fOrgOpc(cCodigos)
+
+Local aOrgaos := fOrgaos()
+Local aOpcoes := {}
+Local nI      := 0
+
+cCodigos := ""
+
+For nI := 1 To Len(aOrgaos)
+	aAdd(aOpcoes, aOrgaos[nI][ORG_COD] + " - " + aOrgaos[nI][ORG_DESC])
+	cCodigos += aOrgaos[nI][ORG_COD]
+Next nI
+
+aAdd(aOpcoes, ORG_NC + " - NÃO CONTROLADO")
+cCodigos += ORG_NC
+
+FwFreeArray(aOrgaos)
+
+Return aOpcoes
+
+/*/{Protheus.doc} fOrgDef
+Conteúdo inicial da pergunta MV_PAR11: apenas os órgãos fiscalizadores vêm marcados.
+As listas da 344/98 ficam desmarcadas (a opção ANVISA já abrange todos os produtos
+controlados pelo órgão) e "não controlado" também, preservando o comportamento
+anterior do relatório.
+@type  Static Function
+@author bacoetrom@gmail.com
+@since  05/11/2026
+@return character, conteúdo inicial da pergunta
+/*/
+Static Function fOrgDef()
+
+Local aOrgaos := fOrgaos()
+Local cVazio  := Replicate("*", ORG_TAM)
+Local cRet    := ""
+Local nI      := 0
+
+For nI := 1 To Len(aOrgaos)
+	//-- ORG_CONTEU preenchido identifica a sublista, que não vem marcada
+	If Empty(aOrgaos[nI][ORG_CONTEU])
+		cRet += aOrgaos[nI][ORG_COD]
+	Else
+		cRet += cVazio
+	EndIf
+Next nI
+
+//-- "Não controlado" é sempre a última opção (fOrgOpc)
+cRet += cVazio
+
+FwFreeArray(aOrgaos)
+
+Return cRet
+
+/*/{Protheus.doc} fOrgPos
+Posição do código na lista de códigos válidos, comparando em blocos de ORG_TAM
+posições. Retorna 0 para as posições não marcadas ("**") e para códigos inexistentes.
+@type  Static Function
+@author bacoetrom@gmail.com
+@since  05/11/2026
+@param cCod, character, código a localizar
+@param cCodigos, character, concatenação dos códigos válidos (fOrgOpc)
+@return numeric, posição do código (1..n) ou 0
+/*/
+Static Function fOrgPos(cCod, cCodigos)
+
+Local nRet := 0
+Local nI   := 0
+
+For nI := 1 To Len(cCodigos) Step ORG_TAM
+	If SubStr(cCodigos, nI, ORG_TAM) == cCod
+		nRet := ((nI - 1) / ORG_TAM) + 1
+		Exit
+	EndIf
+Next nI
+
+Return nRet
 
