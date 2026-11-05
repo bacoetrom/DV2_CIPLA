@@ -384,10 +384,12 @@ adotado nos fontes modelo.
 @return logical, ".T. se a senha do usuário logado está correta"
 /*/
 Method ValidaSenha(cSenha as Character) as Logical Class ZZ1AssinaEletronica
-
-    Local cNomUsr := AllTrim(UsrRetName(RetCodUsr())) as Character
-    Local aRetPsw  as Array
-    Local lRet    := .F. as Logical
+    Local aArea     := FWGetArea()                      as Array
+    Local cNomUsr   := AllTrim(UsrRetName(RetCodUsr())) as Character
+    Local aRetPsw                                       as Array
+    Local lRet      := .F.                              as Logical
+    Local cUserID   := ""                               as Character
+    Local cAtCodVen := __cUserID //Código do usuário farmaceutico
 
     PswOrder(2)
     If PswSeek(cNomUsr, .T.)
@@ -398,6 +400,19 @@ Method ValidaSenha(cSenha as Character) as Logical Class ZZ1AssinaEletronica
             lRet := .T.
         EndIf
     EndIf
+
+    If !lRet
+        If FWAuthUser(@cUserID)
+            If !(cAtCodVen == cUserID)
+                MsgAlert("O login do usuário deve ser igual ao logado no Protheus.", "Atenção")
+                lRet := .F.
+            Else        
+                lRet := .T.
+            EndIf
+        EndIf
+    Endif
+    
+    FWRestArea(aArea)
 
 Return lRet
 
@@ -524,3 +539,26 @@ Static Function fConfirmaZZ1AssEle() as Logical
     _oSelfAssEle:FechaSeValido(_oDlgAssEle, _lOpAssEle)
 
 Return _lOpAssEle
+
+
+Static Function fVldUsr(cNomUsr as Character, cSenha as Character)
+	Local cUsrAux := Alltrim(cNomUsr)
+	Local cPswAux := Alltrim(cSenha)
+	Local cCodAux := ""
+	
+	//Pega o código do usuário
+	RPCClearEnv()
+	If RpcSetEnv("01", "", cUsrAux, cPswAux)
+		cCodAux := RetCodUsr()
+ 	//Senão atualiza o erro e retorna para a rotina
+ 	Else 		
+ 		Return .F.
+	EndIf
+	
+    If !Empty(cCodAux)
+        lRetorno := .T.
+    Else
+        lRetorno := .F.
+    EndIf
+
+Return lRetorno
