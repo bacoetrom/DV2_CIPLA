@@ -60,12 +60,27 @@ B1_TPPROD): lista nova ou descrição alterada no cadastro aparece sem recompilar.
 Só entram chaves com exatamente 2 posições, porque os códigos são concatenados em
 largura fixa. Sem a tabela cadastrada, vale a relação fixa de fListFix.
 
-Campos customizados (SB5): B5_XCAS, B5_XFDS, B5_XARMAZ e B5_XLIMEST.
+Campos customizados (SB5): B5_XCAS, B5_XFDS e B5_XLIMEST.
+
+A coluna "Armazenamento / Storage" é o armazém do saldo (B8_LOCAL / B2_LOCAL), e não a
+condição de guarda: o B5_XARMAZ deixou de ser consultado quando a coluna de armazém
+recebeu esse rótulo.
 Todos são opcionais: campo inexistente na SB5 é impresso como "   ". No filtro, a
 opção cujo campo não existe é ignorada e registrada no diagnóstico - o resultado
 fica mais restrito, nunca mais abrangente. Mas se NENHUMA opção marcada tiver campo
 na SB5, a emissão é bloqueada: sem condição de órgão o relatório listaria todo o
 estoque como se fosse controlado.
+
+Colunas e campos que saíram do layout continuam no fonte, comentados e marcados com
+"[FORA DO LAYOUT]", para facilitar o retorno. São eles:
+  PRODUTO (B1_COD)            substituído pelo Nome Comercial, que virou a âncora do total
+  SUBLOTE (B8_NUMLOTE)        sem reposição
+  LOTEFOR (B8_LOTEFOR)        sem reposição
+  ARMAZEN (B5_XARMAZ)         o rótulo "Armazenamento" passou a designar o armazém
+  NFDOC/NFSERIE/NFEMIS        consolidados na coluna de Notas Fiscais de Compra
+  SLDSIS + CONFERE            checagem de divergência do saldo; nSis ainda é calculado
+  Opção AV (B5_XANVISA)       a ANVISA ganhou pergunta própria (MV_PAR12)
+Cada ponto traz, no comentário, o que precisa ser reativado junto.
 
 @type Function
 @author Pablo Regis
@@ -76,8 +91,16 @@ estoque como se fosse controlado.
 //-- Campos customizados (MIT041 - seção 7.2)
 #DEFINE CPO_CAS      "B5_XNCAS"
 #DEFINE CPO_FDS      "B5_XFDS"
-#DEFINE CPO_ARMAZ    "B5_XARMAZ"
 #DEFINE CPO_LIMEST   "B5_XLIMST"
+
+//-- [FORA DO LAYOUT] Campos que saíram do relatório, mantidos para eventual retorno.
+//-- Procure por "[FORA DO LAYOUT]" para achar todos os pontos envolvidos.
+//-- B5_XANVISA: flag de produto controlado pela ANVISA. Saiu quando a opção ANVISA deixou
+//--   o grupo de órgãos (MV_PAR11) - hoje quem identifica a ANVISA é o B1_TPPROD (MV_PAR12).
+// #DEFINE CPO_ANVISA   "B5_XANVISA"
+//-- B5_XARMAZ: condição de guarda do reagente ("manter refrigerado", "ao abrigo de luz").
+//--   Saiu quando o rótulo "Armazenamento" passou a designar o armazém (B8_LOCAL/B2_LOCAL).
+// #DEFINE CPO_ARMAZ    "B5_XARMAZ"
 
 //-- Lista da Portaria SVS/MS 344/98: campo PADRÃO da SB1 (C 2: "A1".."D2"), o mesmo que
 //-- o MATR924 (Livro de Registro Específico) usa para classificar o produto por livro.
@@ -296,52 +319,74 @@ oSecao:SetTotalInLine(.F.)
 oSecao:SetHeaderPage(.T.)
 
 //-- Identificação
-TRCell():New(oSecao, "FILIAL"  , "", "Filial"          + "/" + "Branch"         , "@!", FWSizeFilial())
-TRCell():New(oSecao, "CONTROL" , "", "Controlado?"     + "/" + "Controlled?"    , "@!", 12)
-TRCell():New(oSecao, "PRODUTO" , "", "Código"          + "/" + "Code"           , "@!", TamSX3("B1_COD")[1])
-TRCell():New(oSecao, "NOMECOM" , "", "Nome Comercial"  + "/" + "Trade Name"     , "@!", 30)
-TRCell():New(oSecao, "NOMEQUI" , "", "Nome Químico"    + "/" + "Chemical Name"  , "@!", 30)
-TRCell():New(oSecao, "CAS"     , "", "Nº CAS"          + "/" + "CAS Number"     , "@!", 12)
-TRCell():New(oSecao, "CODMAPA" , "", "Cód. SIPROQUIM"  + "/" + "SIPROQUIM Code" , "@!", 11)
-TRCell():New(oSecao, "FORMA"   , "", "Forma"           + "/" + "Physical Form"  , "@!", 10)
-TRCell():New(oSecao, "UM"      , "", "UM"              + "/" + "UoM"            , "@!", TamSX3("B1_UM")[1])
+TRCell():New(oSecao, "LINHA"   , "", "Linha"                    + "/" + "Line"                       , "@E 999999", 6, , , "RIGHT", , "RIGHT")
+TRCell():New(oSecao, "FILIAL"  , "", "Filial"                   + "/" + "Branch"                     , "@!", FWSizeFilial())
+TRCell():New(oSecao, "CONTROL" , "", "Controlado"               + "/" + "Controlled"                 , "@!", 12)
 
 //-- Regulatório
-TRCell():New(oSecao, "ORGAO"   , "", "Órgão Fiscaliz." + "/" + "Regulatory Agency", "@!", 30)
-TRCell():New(oSecao, "LIMEST"  , "", "Limite Estoque"  + "/" + "Stock Limit"    , cPictQtd, nTamQtd, , , "RIGHT", , "RIGHT")
-TRCell():New(oSecao, "FDS"     , "", "FDS"             + "/" + "SDS"            , "@!", 20)
-TRCell():New(oSecao, "ARMAZEN" , "", "Armazenamento"   + "/" + "Storage"        , "@!", 20)
+TRCell():New(oSecao, "ORGAO"   , "", "Órgão Fiscalizador"       + "/" + "Surveillance Body"          , "@!", 30)
+TRCell():New(oSecao, "LIMEST"  , "", "Limite de Estoque"        + "/" + "Stock Limit"                , cPictQtd, nTamQtd, , , "RIGHT", , "RIGHT")
 
-//-- Lote
-TRCell():New(oSecao, "ARMAZEM" , "", "Armazém"         + "/" + "Warehouse"      , "@!", TamSX3("B8_LOCAL")[1])
-TRCell():New(oSecao, "LOTE"    , "", "Lote"            + "/" + "Batch"          , "@!", TamSX3("B8_LOTECTL")[1])
-TRCell():New(oSecao, "SUBLOTE" , "", "Sub-Lote"        + "/" + "Sub-Batch"      , "@!", TamSX3("B8_NUMLOTE")[1])
-TRCell():New(oSecao, "LOTEFOR" , "", "Lote Fabric."    + "/" + "Mfr. Batch"     , "@!", TamSX3("B8_LOTEFOR")[1])
-TRCell():New(oSecao, "FABRIC"  , "", "Fabricante"      + "/" + "Manufacturer"   , "@!", 30)
-TRCell():New(oSecao, "DTFABRIC", "", "Dt. Fabricação"  + "/" + "Mfg. Date"      , "@D", 10)
-TRCell():New(oSecao, "DTVALID" , "", "Dt. Validade"    + "/" + "Expiry Date"    , "@D", 10)
-
-//-- Nota fiscal de compra
-TRCell():New(oSecao, "NFDOC"   , "", "NF Compra"       + "/" + "Purchase Inv."  , "@!", TamSX3("B8_DOC")[1])
-TRCell():New(oSecao, "NFSERIE" , "", "Série"           + "/" + "Series"         , "@!", TamSX3("B8_SERIE")[1])
-TRCell():New(oSecao, "NFEMIS"  , "", "Emissão NF"      + "/" + "Inv. Date"      , "@D", 10)
+//-- Identificação do reagente
+//-- [FORA DO LAYOUT] Código do produto (B1_COD). O produto passou a ser identificado pelo
+//-- Nome Comercial, que também virou a âncora da quebra de total. Para voltar, reative
+//-- aqui, o oItem["PRODUTO"] em fMontaItem, o nome em fImprime e o TRBreak abaixo.
+// TRCell():New(oSecao, "PRODUTO" , "", "Código"                   + "/" + "Code"                       , "@!", TamSX3("B1_COD")[1])
+TRCell():New(oSecao, "CODMAPA" , "", "Código do Reagente"       + "/" + "Reagent Code"               , "@!", 18)
+TRCell():New(oSecao, "NOMECOM" , "", "Nome Comercial (Rótulo)"  + "/" + "Commercial Name (Label)"    , "@!", 30)
+TRCell():New(oSecao, "NOMEQUI" , "", "Nome Químico (Português)" + "/" + "Chemical Name (Portuguese)" , "@!", 30)
+TRCell():New(oSecao, "CAS"     , "", "Número CAS"               + "/" + "CAS Number"                 , "@!", 12)
+TRCell():New(oSecao, "FORMA"   , "", "Forma"                    + "/" + "Form"                       , "@!", 10)
+TRCell():New(oSecao, "FABRIC"  , "", "Fabricante"               + "/" + "Manufacturer"               , "@!", 30)
+TRCell():New(oSecao, "LOTE"    , "", "Lote"                     + "/" + "Batch"                      , "@!", TamSX3("B8_LOTECTL")[1])
+//-- [FORA DO LAYOUT] Sub-lote e lote do fornecedor. Sem a coluna de sub-lote, produtos com
+//-- rastro "S" geram uma linha por sub-lote que fica visualmente idêntica às demais.
+// TRCell():New(oSecao, "SUBLOTE" , "", "Sub-Lote"                 + "/" + "Sub-Batch"                  , "@!", TamSX3("B8_NUMLOTE")[1])
+// TRCell():New(oSecao, "LOTEFOR" , "", "Lote Fabric."             + "/" + "Mfr. Batch"                 , "@!", TamSX3("B8_LOTEFOR")[1])
+TRCell():New(oSecao, "FDS"     , "", "FDS"                      + "/" + "SDS"                        , "@!", 20)
+//-- "Armazenamento" é o armazém/depósito do saldo (B8_LOCAL / B2_LOCAL), não a
+//-- condição de guarda: o rótulo mudou, a origem do dado continua sendo o depósito
+TRCell():New(oSecao, "ARMAZEM" , "", "Armazenamento"            + "/" + "Storage"                    , "@!", 20)
+//-- [FORA DO LAYOUT] Condição de guarda do reagente (B5_XARMAZ), que ocupava o rótulo
+//-- "Armazenamento" antes de ele passar a designar o armazém. Se as duas informações
+//-- precisarem conviver, reative com um rótulo próprio (ex.: "Condições de Armazenamento").
+// TRCell():New(oSecao, "ARMAZEN" , "", "Condições de Armazenamento" + "/" + "Storage Conditions"     , "@!", 20)
+TRCell():New(oSecao, "DTFABRIC", "", "Data de Fabricação"       + "/" + "Manufacture Date"           , "@D", 10)
+TRCell():New(oSecao, "DTVALID" , "", "Data de Validade"         + "/" + "Expiry Date"                , "@D", 10)
+TRCell():New(oSecao, "UM"      , "", "Unidade de Medida"        + "/" + "Unit of Measure"            , "@!", TamSX3("B1_UM")[1])
 
 //-- Balanço do período
-TRCell():New(oSecao, "SLDINI"  , "", "Saldo Inicial"   + "/" + "Opening Balance", cPictQtd, nTamQtd, , , "RIGHT", , "RIGHT")
-TRCell():New(oSecao, "COMPRAS" , "", "Compras"         + "/" + "Purchases"      , cPictQtd, nTamQtd, , , "RIGHT", , "RIGHT")
-TRCell():New(oSecao, "CONSUMO" , "", "Consumo"         + "/" + "Consumption"    , cPictQtd, nTamQtd, , , "RIGHT", , "RIGHT")
-TRCell():New(oSecao, "PERDAS"  , "", "Perdas/Transf."  + "/" + "Losses/Transfers", cPictQtd, nTamQtd, , , "RIGHT", , "RIGHT")
-TRCell():New(oSecao, "SLDFIM"  , "", "Saldo Final"     + "/" + "Closing Balance", cPictQtd, nTamQtd, , , "RIGHT", , "RIGHT")
-TRCell():New(oSecao, "SLDSIS"  , "", "Saldo Sistema"   + "/" + "System Balance" , cPictQtd, nTamQtd, , , "RIGHT", , "RIGHT")
-TRCell():New(oSecao, "CONFERE" , "", "Conferência"     + "/" + "Check"          , "@!", 10)
+TRCell():New(oSecao, "SLDINI"  , "", "Estoque Inicial do Mês"   + "/" + "Initial Monthly Inventory"  , cPictQtd, nTamQtd, , , "RIGHT", , "RIGHT")
+TRCell():New(oSecao, "COMPRAS" , "", "Quantidade Comprada"      + "/" + "Quantity Purchased"         , cPictQtd, nTamQtd, , , "RIGHT", , "RIGHT")
+TRCell():New(oSecao, "NFCOMPRA", "", "Notas Fiscais de Compra (Número, Fornecedor e Data)" + "/" + ;
+                                     "Purchase Invoices (Number, Vendor and Date)"                   , "@!", 50)
+//-- [FORA DO LAYOUT] As três colunas separadas da NF, consolidadas na coluna acima
+//-- (fNFCompra). O fornecedor não existia como coluna e só passou a sair na consolidada.
+// TRCell():New(oSecao, "NFDOC"   , "", "NF Compra"                + "/" + "Purchase Inv."              , "@!", TamSX3("B8_DOC")[1])
+// TRCell():New(oSecao, "NFSERIE" , "", "Série"                    + "/" + "Series"                     , "@!", TamSX3("B8_SERIE")[1])
+// TRCell():New(oSecao, "NFEMIS"  , "", "Emissão NF"               + "/" + "Inv. Date"                  , "@D", 10)
+TRCell():New(oSecao, "CONSUMO" , "", "Quantidade Utilizada no Mês" + "/" + "Quantity Used During the Month", cPictQtd, nTamQtd, , , "RIGHT", , "RIGHT")
+TRCell():New(oSecao, "PERDAS"  , "", "Perdas e Transferências"  + "/" + "Losses and Transfers"       , cPictQtd, nTamQtd, , , "RIGHT", , "RIGHT")
+TRCell():New(oSecao, "SLDFIM"  , "", "Estoque Final"            + "/" + "Final Inventory"            , cPictQtd, nTamQtd, , , "RIGHT", , "RIGHT")
+//-- [FORA DO LAYOUT] Conferência do saldo: "Estoque Final" é o saldo CALCULADO
+//-- (inicial + compras - consumo - perdas) e "Saldo Sistema" era o saldo real na data
+//-- final; a coluna "Conferência" comparava os dois e acusava DIVERGENTE. O nSis continua
+//-- sendo calculado em fMontaItem, então basta reativar estas duas colunas e os
+//-- respectivos oItem[] para ter a checagem de volta.
+// TRCell():New(oSecao, "SLDSIS"  , "", "Saldo Sistema"            + "/" + "System Balance"             , cPictQtd, nTamQtd, , , "RIGHT", , "RIGHT")
+// TRCell():New(oSecao, "CONFERE" , "", "Conferência"              + "/" + "Check"                      , "@!", 10)
 
 //-- Responsabilidade (preenchimento manual)
-TRCell():New(oSecao, "RESP"    , "", "Responsável"     + "/" + "Responsible"    , "@!", 15)
-TRCell():New(oSecao, "CONFER"  , "", "Conferente"      + "/" + "Checked by"     , "@!", 15)
-TRCell():New(oSecao, "OBS"     , "", "Observações"     + "/" + "Remarks"        , "@!", 20)
+TRCell():New(oSecao, "RESP"    , "", "Responsável"              + "/" + "Responsible Person"         , "@!", 15)
+TRCell():New(oSecao, "CONFER"  , "", "Conferente"               + "/" + "Checker"                    , "@!", 15)
+TRCell():New(oSecao, "OBS"     , "", "Observações"              + "/" + "Notes"                      , "@!", 20)
 
-//-- Totais por produto (unidades diferentes entre produtos: sem total geral)
-oBreak := TRBreak():New(oSecao, oSecao:Cell("PRODUTO"), "Total do produto / Product total", .F.)
+//-- Totais por produto (unidades diferentes entre produtos: sem total geral).
+//-- O produto é identificado pelo Nome Comercial, que substituiu a coluna de código
+oBreak := TRBreak():New(oSecao, oSecao:Cell("NOMECOM"), "Total do produto / Product total", .F.)
+//-- [FORA DO LAYOUT] Quebra original, pelo código do produto. Reativar junto com a
+//-- coluna PRODUTO: agrupa pelo código, que é exato, em vez do nome comercial.
+// oBreak := TRBreak():New(oSecao, oSecao:Cell("PRODUTO"), "Total do produto / Product total", .F.)
 TRFunction():New(oSecao:Cell("SLDINI" ), , "SUM", oBreak, , cPictQtd, , .F., .F.)
 TRFunction():New(oSecao:Cell("COMPRAS"), , "SUM", oBreak, , cPictQtd, , .F., .F.)
 TRFunction():New(oSecao:Cell("CONSUMO"), , "SUM", oBreak, , cPictQtd, , .F., .F.)
@@ -693,8 +738,10 @@ While !(cAlias)->(Eof()) .And. !oReport:Cancel()
 		oDiag["LIDOS"] += 1
 		oItem   := fMontaItem(cAlias, .T., lSubLote, oMov, cChave, aOrgaos, aListas, oCfg, oCache, oDiag)
 		If ValType(oItem) $ "O/J"   //-- JsonObject retorna "J"
-			fImprime(oSecao, oItem)
+			//-- Sequencial contínuo da coluna "Linha": reaproveita o contador de impressos
 			oDiag["IMPRESSOS"] += 1
+			oItem["LINHA"] := oDiag["IMPRESSOS"]
+			fImprime(oSecao, oItem)
 			FreeObj(oItem)
 		EndIf
 	EndIf
@@ -728,8 +775,9 @@ While !(cAlias)->(Eof()) .And. !oReport:Cancel()
 	oDiag["LIDOS"] += 1
 	oItem  := fMontaItem(cAlias, .F., .F., oMov, cChave, aOrgaos, aListas, oCfg, oCache, oDiag)
 	If ValType(oItem) $ "O/J"   //-- JsonObject retorna "J"
-		fImprime(oSecao, oItem)
 		oDiag["IMPRESSOS"] += 1
+		oItem["LINHA"] := oDiag["IMPRESSOS"]
+		fImprime(oSecao, oItem)
 		FreeObj(oItem)
 	EndIf
 	(cAlias)->(DbSkip())
@@ -896,7 +944,9 @@ SB1->(MsSeek(xFilial("SB1") + cProd))
 
 oItem := JsonObject():New()
 oItem["FILIAL"  ] := cFilAnt
-oItem["PRODUTO" ] := cProd
+//-- [FORA DO LAYOUT] Código do produto, hoje sem coluna
+// oItem["PRODUTO" ] := cProd
+//-- Nome Comercial identifica o produto no layout (não há coluna de código)
 oItem["NOMECOM" ] := fCpoSB5(oCfg["DESCPR"], "")
 If Empty(oItem["NOMECOM"])
 	oItem["NOMECOM"] := (cAlias)->DESCRI
@@ -921,30 +971,35 @@ Else
 	oItem["LIMEST"  ] := (cAlias)->EMAX
 EndIf
 oItem["FDS"     ] := fCpoSB5(CPO_FDS, CPO_VAZIO)
-oItem["ARMAZEN" ] := fCpoSB5(CPO_ARMAZ, CPO_VAZIO)
 oItem["ARMAZEM" ] := cLocal
+//-- [FORA DO LAYOUT] Condição de guarda (B5_XARMAZ), ver CPO_ARMAZ nos #DEFINE
+// oItem["ARMAZEN" ] := fCpoSB5(CPO_ARMAZ, CPO_VAZIO)
 
 If lLote
 	oItem["LOTE"    ] := cLote
-	oItem["SUBLOTE" ] := If(lSubLote, (cAlias)->SUBLOTE, "")
-	oItem["LOTEFOR" ] := (cAlias)->LOTEFOR
 	oItem["FABRIC"  ] := fFabric(cProd, cLote, (cAlias)->ORIGLAN, (cAlias)->CLIFOR, (cAlias)->LOJA, oCache)
 	oItem["DTFABRIC"] := (cAlias)->DTFABRIC
 	oItem["DTVALID" ] := (cAlias)->DTVALID
-	oItem["NFDOC"   ] := (cAlias)->DOC
-	oItem["NFSERIE" ] := (cAlias)->SERIE
-	oItem["NFEMIS"  ] := If(Empty((cAlias)->DOC), CtoD(""), ;
-	                     Posicione("SF1", 1, xFilial("SF1") + (cAlias)->DOC + (cAlias)->SERIE + (cAlias)->CLIFOR + (cAlias)->LOJA, "F1_EMISSAO"))
+	oItem["NFCOMPRA"] := fNFCompra(cAlias)
+	//-- [FORA DO LAYOUT] Sub-lote, lote do fornecedor e NF em colunas separadas
+	// oItem["SUBLOTE" ] := If(lSubLote, (cAlias)->SUBLOTE, "")
+	// oItem["LOTEFOR" ] := (cAlias)->LOTEFOR
+	// oItem["NFDOC"   ] := (cAlias)->DOC
+	// oItem["NFSERIE" ] := (cAlias)->SERIE
+	// oItem["NFEMIS"  ] := If(Empty((cAlias)->DOC), CtoD(""), ;
+	//                      Posicione("SF1", 1, xFilial("SF1") + (cAlias)->DOC + (cAlias)->SERIE + (cAlias)->CLIFOR + (cAlias)->LOJA, "F1_EMISSAO"))
 Else
 	oItem["LOTE"    ] := ""
-	oItem["SUBLOTE" ] := ""
-	oItem["LOTEFOR" ] := ""
 	oItem["FABRIC"  ] := ""
 	oItem["DTFABRIC"] := CtoD("")
 	oItem["DTVALID" ] := CtoD("")
-	oItem["NFDOC"   ] := ""
-	oItem["NFSERIE" ] := ""
-	oItem["NFEMIS"  ] := CtoD("")
+	oItem["NFCOMPRA"] := ""
+	//-- [FORA DO LAYOUT] Contrapartida das colunas acima para produto sem rastro
+	// oItem["SUBLOTE" ] := ""
+	// oItem["LOTEFOR" ] := ""
+	// oItem["NFDOC"   ] := ""
+	// oItem["NFSERIE" ] := ""
+	// oItem["NFEMIS"  ] := CtoD("")
 EndIf
 
 oItem["SLDINI"  ] := nIni
@@ -952,11 +1007,15 @@ oItem["COMPRAS" ] := aMov[1]
 oItem["CONSUMO" ] := aMov[2]
 oItem["PERDAS"  ] := aMov[3]
 oItem["SLDFIM"  ] := nFim
-oItem["SLDSIS"  ] := nSis
-oItem["CONFERE" ] := If(Abs(nFim - nSis) < 0.0001, "OK", "DIVERGENTE")
 oItem["RESP"    ] := ""
 oItem["CONFER"  ] := ""
 oItem["OBS"     ] := ""
+
+//-- [FORA DO LAYOUT] Saldo do sistema e conferência. O nSis continua sendo calculado
+//-- acima (serve para descartar item sem saldo e sem movimento), então para ter a
+//-- checagem de volta basta reativar estas duas linhas e as colunas em ReportDef.
+// oItem["SLDSIS"  ] := nSis
+// oItem["CONFERE" ] := If(Abs(nFim - nSis) < 0.0001, "OK", "DIVERGENTE")
 
 Return oItem
 
@@ -965,10 +1024,13 @@ Transfere os valores do item para as células e imprime a linha.
 /*/
 Static Function fImprime(oSecao, oItem)
 
-Local aCelulas := {"FILIAL", "CONTROL", "PRODUTO", "NOMECOM", "NOMEQUI", "CAS", "CODMAPA", "FORMA", "UM", ;
-                   "ORGAO", "LIMEST", "FDS", "ARMAZEN", "ARMAZEM", "LOTE", "SUBLOTE", "LOTEFOR", ;
-                   "FABRIC", "DTFABRIC", "DTVALID", "NFDOC", "NFSERIE", "NFEMIS", "SLDINI", ;
-                   "COMPRAS", "CONSUMO", "PERDAS", "SLDFIM", "SLDSIS", "CONFERE", "RESP", "CONFER", "OBS"}
+//-- Mesma ordem das células em ReportDef.
+//-- [FORA DO LAYOUT] Ao reativar uma coluna, acrescente o nome aqui na posição
+//-- correspondente: "PRODUTO", "SUBLOTE", "LOTEFOR", "ARMAZEN", "NFDOC", "NFSERIE",
+//-- "NFEMIS", "SLDSIS", "CONFERE".
+Local aCelulas := {"LINHA", "FILIAL", "CONTROL", "ORGAO", "LIMEST", "CODMAPA", "NOMECOM", "NOMEQUI", ;
+                   "CAS", "FORMA", "FABRIC", "LOTE", "FDS", "ARMAZEM", "DTFABRIC", "DTVALID", "UM", ;
+                   "SLDINI", "COMPRAS", "NFCOMPRA", "CONSUMO", "PERDAS", "SLDFIM", "RESP", "CONFER", "OBS"}
 Local nI       := 0
 
 For nI := 1 To Len(aCelulas)
@@ -978,6 +1040,45 @@ Next nI
 oSecao:PrintLine()
 
 Return
+
+/*/{Protheus.doc} fNFCompra
+Nota fiscal de entrada do lote num único texto: "numero/serie - fornecedor - emissao".
+Cada parte só entra quando tem conteúdo, para não deixar separadores soltos.
+@type  Static Function
+@author bacoetrom@gmail.com
+@since  06/11/2026
+@param cAlias, character, alias da consulta posicionada no lote (SB8)
+@return character, nota fiscal de compra formatada
+/*/
+Static Function fNFCompra(cAlias)
+
+Local cDoc   := AllTrim((cAlias)->DOC)
+Local cSerie := AllTrim((cAlias)->SERIE)
+Local cForn  := ""
+Local dEmis  := CtoD("")
+Local cRet   := ""
+
+If !Empty(cDoc)
+	cRet := cDoc
+	If !Empty(cSerie)
+		cRet += "/" + cSerie
+	EndIf
+
+	If !Empty((cAlias)->CLIFOR)
+		cForn := fNomeSA2((cAlias)->CLIFOR + (cAlias)->LOJA)
+		If !Empty(cForn)
+			cRet += " - " + cForn
+		EndIf
+	EndIf
+
+	dEmis := Posicione("SF1", 1, xFilial("SF1") + (cAlias)->DOC + (cAlias)->SERIE + ;
+	                   (cAlias)->CLIFOR + (cAlias)->LOJA, "F1_EMISSAO")
+	If !Empty(dEmis)
+		cRet += " - " + DtoC(dEmis)
+	EndIf
+EndIf
+
+Return cRet
 
 /*/{Protheus.doc} fFabric
 Fabricante do lote via amarração Produto x Fornecedor (SA5) - MIT041, seção 5.
@@ -1078,6 +1179,11 @@ Local aOrgaos := {}
 aAdd(aOrgaos, {"PC", "POLÍCIA CIVIL"  , fCampoMV("MV_MTR947A")      , "MV_MTR947A", .F., "", "SB5"})
 aAdd(aOrgaos, {"PF", "POLÍCIA FEDERAL", fCampoMV("MV_PRODPF")       , "MV_PRODPF" , .F., "", "SB5"})
 aAdd(aOrgaos, {"EX", "EXÉRCITO"       , fCampoMV("MV_MTR949A")      , "MV_MTR949A", .F., "", "SB5"})
+//-- [FORA DO LAYOUT] Opção ANVISA pela flag B5_XANVISA (ver CPO_ANVISA nos #DEFINE).
+//-- Saiu porque a ANVISA ganhou pergunta própria (MV_PAR12, listas da 344/98). Reativar
+//-- aqui faria a flag voltar ao filtro de órgãos e às colunas "Órgão Fiscalizador" e
+//-- "Controlado", convivendo com as listas.
+// aAdd(aOrgaos, {"AV", "ANVISA"         , fCampoSB5(CPO_ANVISA, .T.)  , ""          , .T., "", "SB5"})
 
 Return aOrgaos
 
