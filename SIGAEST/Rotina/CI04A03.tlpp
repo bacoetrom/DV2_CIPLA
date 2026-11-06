@@ -302,10 +302,12 @@ bruto retornado por PswRet() e, como alternativa, PswName().
 @return logical, ".T. se a senha do usuario logado esta correta"
 /*/
 Method ValidaSenha(cSenha as Character) as Logical Class ZZ2AssinaEletronica
-
+    Local aArea     := FWGetArea()                      as Array
     Local cNomUsr := AllTrim(UsrRetName(RetCodUsr())) as Character
     Local aRetPsw as Array
     Local lRet    := .F. as Logical
+    Local cUserID   := ""                               as Character
+    Local cAtCodVen := __cUserID //Código do usuário farmaceutico
 
     PswOrder(2)
     If PswSeek(cNomUsr, .T.)
@@ -316,6 +318,19 @@ Method ValidaSenha(cSenha as Character) as Logical Class ZZ2AssinaEletronica
             lRet := .T.
         EndIf
     EndIf
+
+    If !lRet
+        If FWAuthUser(@cUserID)
+            If !(cAtCodVen == cUserID)
+                MsgAlert("O login do usuário deve ser igual ao logado no Protheus.", "Atenção")
+                lRet := .F.
+            Else        
+                lRet := .T.
+            EndIf
+        EndIf
+    Endif
+
+    FWRestArea(aArea)
 
 Return lRet
 
