@@ -77,7 +77,7 @@ estoque como se fosse controlado.
 #DEFINE CPO_CAS      "B5_XNCAS"
 #DEFINE CPO_FDS      "B5_XFDS"
 #DEFINE CPO_ARMAZ    "B5_XARMAZ"
-#DEFINE CPO_LIMEST   "B5_XLIMEST"
+#DEFINE CPO_LIMEST   "B5_XLIMST"
 
 //-- Lista da Portaria SVS/MS 344/98: campo PADRÃO da SB1 (C 2: "A1".."D2"), o mesmo que
 //-- o MATR924 (Livro de Registro Específico) usa para classificar o produto por livro.
