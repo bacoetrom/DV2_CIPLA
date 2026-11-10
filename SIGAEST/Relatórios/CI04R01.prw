@@ -13,7 +13,9 @@ em SB8), MATR435 (CalcEstL por lote) e MATR330 (classificação por CF/CFOP).
 
 Parâmetros (ParamBox - não depende de SX1; respostas salvas no perfil do usuário):
   MV_PAR01 Filial de                C  tam. filial   F3 SM0
-  MV_PAR02 Filial até               C  tam. filial   F3 SM0
+  MV_PAR02 Filial até               C  tam. filial   F3 SM0 - o intervalo das duas
+           perguntas é aplicado por BETWEEN nas consultas, respeitando o modo de
+           compartilhamento de cada tabela (ver fFilCond)
   MV_PAR03 Período de               D
   MV_PAR04 Período até              D
   MV_PAR05 Grupo de Produto de      C  tam. BM_GRUPO F3 SBM
@@ -60,7 +62,10 @@ B1_TPPROD): lista nova ou descrição alterada no cadastro aparece sem recompilar.
 Só entram chaves com exatamente 2 posições, porque os códigos são concatenados em
 largura fixa. Sem a tabela cadastrada, vale a relação fixa de fListFix.
 
-Campos customizados (SB5): B5_XCAS, B5_XFDS e B5_XLIMEST.
+Campos customizados (SB5): B5_XCAS e B5_XFDS.
+
+Limite de estoque: BZ_EMAX (SBZ - Produto x Filial) e, na falta dele, B1_EMAX (SB1),
+resolvidos por fLimEst. O limite deixou de ter campo customizado na SB5.
 
 A coluna "Armazenamento / Storage" é o armazém do saldo (B8_LOCAL / B2_LOCAL), e não a
 condição de guarda: o B5_XARMAZ deixou de ser consultado quando a coluna de armazém
@@ -91,7 +96,6 @@ Cada ponto traz, no comentário, o que precisa ser reativado junto.
 //-- Campos customizados (MIT041 - seção 7.2)
 #DEFINE CPO_CAS      "B5_XNCAS"
 #DEFINE CPO_FDS      "B5_XFDS"
-#DEFINE CPO_LIMEST   "B5_XLIMST"
 
 //-- [FORA DO LAYOUT] Campos que saíram do relatório, mantidos para eventual retorno.
 //-- Procure por "[FORA DO LAYOUT]" para achar todos os pontos envolvidos.
@@ -304,6 +308,7 @@ Static Function ReportDef()
 Local oReport
 Local oSecao
 Local oBreak
+Local oBrkFil
 Local cPictQtd := PesqPict("SB8", "B8_SALDO")
 Local nTamQtd  := TamSX3("B8_SALDO")[1] + 4
 Local cTitulo  := "Balanço de Estoque de Reagentes Controlados / Controlled Reagents Stock Balance"
@@ -331,7 +336,7 @@ TRCell():New(oSecao, "LIMEST"  , "", "Limite de Estoque"        + "/" + "Stock L
 //-- [FORA DO LAYOUT] Código do produto (B1_COD). O produto passou a ser identificado pelo
 //-- Nome Comercial, que também virou a âncora da quebra de total. Para voltar, reative
 //-- aqui, o oItem["PRODUTO"] em fMontaItem, o nome em fImprime e o TRBreak abaixo.
-// TRCell():New(oSecao, "PRODUTO" , "", "Código"                   + "/" + "Code"                       , "@!", TamSX3("B1_COD")[1])
+TRCell():New(oSecao, "PRODUTO" , "", "Código"                   + "/" + "Code"                       , "@!", TamSX3("B1_COD")[1])
 TRCell():New(oSecao, "CODMAPA" , "", "Código do Reagente"       + "/" + "Reagent Code"               , "@!", 18)
 TRCell():New(oSecao, "NOMECOM" , "", "Nome Comercial (Rótulo)"  + "/" + "Commercial Name (Label)"    , "@!", 30)
 TRCell():New(oSecao, "NOMEQUI" , "", "Nome Químico (Português)" + "/" + "Chemical Name (Portuguese)" , "@!", 30)
@@ -381,12 +386,19 @@ TRCell():New(oSecao, "RESP"    , "", "Responsável"              + "/" + "Respons
 TRCell():New(oSecao, "CONFER"  , "", "Conferente"               + "/" + "Checker"                    , "@!", 15)
 TRCell():New(oSecao, "OBS"     , "", "Observações"              + "/" + "Notes"                      , "@!", 20)
 
-//-- Totais por produto (unidades diferentes entre produtos: sem total geral).
-//-- O produto é identificado pelo Nome Comercial, que substituiu a coluna de código
-oBreak := TRBreak():New(oSecao, oSecao:Cell("NOMECOM"), "Total do produto / Product total", .F.)
-//-- [FORA DO LAYOUT] Quebra original, pelo código do produto. Reativar junto com a
-//-- coluna PRODUTO: agrupa pelo código, que é exato, em vez do nome comercial.
-// oBreak := TRBreak():New(oSecao, oSecao:Cell("PRODUTO"), "Total do produto / Product total", .F.)
+//-- Totais por filial e por produto (unidades diferentes entre produtos: sem total geral).
+//-- A filial é a quebra maior, acompanhando o ORDER BY FILIAL, PRODUTO das consultas: sem
+//-- ela, um produto que fecha uma filial e abre a seguinte cairia num total único
+oBrkFil := TRBreak():New(oSecao, oSecao:Cell("FILIAL"), "Total da filial / Branch total", .F.)
+TRFunction():New(oSecao:Cell("SLDINI" ), , "SUM", oBrkFil, , cPictQtd, , .F., .F.)
+TRFunction():New(oSecao:Cell("COMPRAS"), , "SUM", oBrkFil, , cPictQtd, , .F., .F.)
+TRFunction():New(oSecao:Cell("CONSUMO"), , "SUM", oBrkFil, , cPictQtd, , .F., .F.)
+TRFunction():New(oSecao:Cell("PERDAS" ), , "SUM", oBrkFil, , cPictQtd, , .F., .F.)
+TRFunction():New(oSecao:Cell("SLDFIM" ), , "SUM", oBrkFil, , cPictQtd, , .F., .F.)
+
+//-- O produto é identificado pelo código, que é exato, e não pelo nome comercial
+// oBreak := TRBreak():New(oSecao, oSecao:Cell("NOMECOM"), "Total do produto / Product total", .F.)
+oBreak := TRBreak():New(oSecao, oSecao:Cell("PRODUTO"), "Total do produto / Product total", .F.)
 TRFunction():New(oSecao:Cell("SLDINI" ), , "SUM", oBreak, , cPictQtd, , .F., .F.)
 TRFunction():New(oSecao:Cell("COMPRAS"), , "SUM", oBreak, , cPictQtd, , .F., .F.)
 TRFunction():New(oSecao:Cell("CONSUMO"), , "SUM", oBreak, , cPictQtd, , .F., .F.)
@@ -464,17 +476,14 @@ EndIf
 oCfg := fConfig()
 
 oReport:SetTitle(oReport:Title() + " - " + DtoC(mv_par03) + " a " + DtoC(mv_par04))
-oReport:SetMeter(Len(aFiliais))
+//-- Duas consultas percorrem o mesmo intervalo de filiais (SB8 com rastro e SB2 sem rastro)
+oReport:SetMeter(Len(aFiliais) * 2)
 oSecao:Init()
 
-For nI := 1 To Len(aFiliais)
-	If oReport:Cancel()
-		Exit
-	EndIf
-	cFilAnt := aFiliais[nI]        //-- CalcEst/CalcEstL e xFilial() usam a filial corrente
-	oReport:IncMeter()
-	fProcFil(oReport, oSecao, aOrgaos, aListas, cCondOrg, oCfg, oDiag)
-Next nI
+//-- Filial de referência: usada apenas por registro de tabela compartilhada, que não
+//-- traz filial própria. A filial de cada linha vem do registro, dentro de fMontaItem
+cFilAnt := aFiliais[1]
+fProcessa(oReport, oSecao, aOrgaos, aListas, cCondOrg, oCfg, oDiag)
 
 oSecao:Finish()
 cFilAnt := cFilBak
@@ -483,7 +492,7 @@ cFilAnt := cFilBak
 If oDiag["IMPRESSOS"] == 0 .And. !oReport:Cancel()
 	Help(NIL, NIL, NUM_PERG, NIL, ;
 	     "Nenhuma linha impressa." + CRLF + ;
-	     "Filiais processadas: " + oDiag["FILIAIS"] + CRLF + ;
+	     "Filtro de filial aplicado: " + oDiag["FILIAIS"] + CRLF + ;
 	     "Registros lidos nas consultas: " + cValToChar(oDiag["LIDOS"]) + CRLF + ;
 	     "Descartados (sem saldo e sem movimento): " + cValToChar(oDiag["DESCART"]) + CRLF + ;
 	     "Exemplo descartado: " + oDiag["EXEMPLO"] + CRLF + ;
@@ -686,10 +695,18 @@ FwFreeArray(aCond)
 
 Return lRet
 
-/*/{Protheus.doc} fProcFil
-Processa a filial corrente: produtos com rastro (SB8) e sem rastro (SB2).
+/*/{Protheus.doc} fProcessa
+Processa o intervalo de filiais (MV_PAR01 a MV_PAR02) em duas consultas: produtos com
+rastro de lote/sublote (SB8) e produtos sem rastro (SB2).
+
+A filial de cada linha vem do próprio registro (B8_FILIAL / B2_FILIAL), e não de um laço
+externo: é ela que alimenta o saldo, o limite e a busca dos cadastros em fMontaItem. O
+recorte do intervalo fica com fFilCond, que respeita o compartilhamento de cada tabela.
+@type Function
+@author Pablo Regis
+@since  10/11/2026
 /*/
-Static Function fProcFil(oReport, oSecao, aOrgaos, aListas, cCondOrg, oCfg, oDiag)
+Static Function fProcessa(oReport, oSecao, aOrgaos, aListas, cCondOrg, oCfg, oDiag)
 
 Local oMov     := fCarregaMov()
 Local oCache   := JsonObject():New()
@@ -698,39 +715,56 @@ Local cAlias   := GetNextAlias()
 Local cQry     := ""
 Local cChave   := ""
 Local cChvAnt  := ""
+Local cSubChv  := ""
+Local cFilAtu  := ""
 Local lSubLote := .F.
 
-oDiag["FILIAIS"] += "[" + cFilAnt + " SB8='" + xFilial("SB8") + "' SB1='" + xFilial("SB1") + ;
-                    "' SB5='" + xFilial("SB5") + "'] "
+oDiag["FILIAIS"] += "[SB8: " + fFilCond("SB8", "B8_FILIAL") + "| SB2: " + fFilCond("SB2", "B2_FILIAL") + "] "
 
-//-- 1) Produtos com rastro de lote/sublote: um registro por Produto + Armazém + Lote (+ Sub-Lote)
-cQry := "SELECT SB8.B8_PRODUTO PRODUTO, SB8.B8_LOCAL ARMAZEM, SB8.B8_LOTECTL LOTE, SB8.B8_NUMLOTE SUBLOTE, "
+//-- 1) Produtos com rastro de lote/sublote: um registro por Filial + Produto + Armazém + Lote (+ Sub-Lote)
+cQry := "SELECT SB8.B8_FILIAL FILIAL, SB8.B8_PRODUTO PRODUTO, SB8.B8_LOCAL ARMAZEM, "
+cQry += "       SB8.B8_LOTECTL LOTE, SB8.B8_NUMLOTE SUBLOTE, "
 cQry += "       SB8.B8_DTVALID DTVALID, SB8.B8_DFABRIC DTFABRIC, SB8.B8_LOTEFOR LOTEFOR, "
 cQry += "       SB8.B8_DOC DOC, SB8.B8_SERIE SERIE, SB8.B8_CLIFOR CLIFOR, SB8.B8_LOJA LOJA, SB8.B8_ORIGLAN ORIGLAN, "
-cQry += "       SB1.B1_DESC DESCRI, SB1.B1_UM UM, SB1.B1_RASTRO RASTRO, SB1.B1_EMAX EMAX "
+//-- B1_EMAX saiu do cursor quando o limite passou a ser resolvido por fLimEst (SBZ -> SB1).
+//-- Para voltar a usar o valor da query, reative a coluna, o TcSetField abaixo e passe
+//-- (cAlias)->EMAX ao fLimEst no lugar do Posicione na SB1.
+// cQry += "       SB1.B1_DESC DESCRI, SB1.B1_UM UM, SB1.B1_RASTRO RASTRO, SB1.B1_EMAX EMAX "
+cQry += "       SB1.B1_DESC DESCRI, SB1.B1_UM UM, SB1.B1_RASTRO RASTRO "
 cQry += "  FROM " + RetSqlName("SB8") + " SB8 "
-cQry += " INNER JOIN " + RetSqlName("SB1") + " SB1 ON SB1.B1_FILIAL = '" + xFilial("SB1") + "' "
+cQry += " INNER JOIN " + RetSqlName("SB1") + " SB1 ON " + fFilJoin("SB1", "SB1.B1_FILIAL", "SB8.B8_FILIAL")
 cQry += "       AND SB1.B1_COD = SB8.B8_PRODUTO AND SB1.D_E_L_E_T_ = ' ' "
-cQry += "  LEFT JOIN " + RetSqlName("SB5") + " SB5 ON SB5.B5_FILIAL = '" + xFilial("SB5") + "' "
+cQry += "  LEFT JOIN " + RetSqlName("SB5") + " SB5 ON " + fFilJoin("SB5", "SB5.B5_FILIAL", "SB8.B8_FILIAL")
 cQry += "       AND SB5.B5_COD = SB8.B8_PRODUTO AND SB5.D_E_L_E_T_ = ' ' "
-cQry += " WHERE SB8.B8_FILIAL = '" + xFilial("SB8") + "' "
+cQry += " WHERE " + fFilCond("SB8", "SB8.B8_FILIAL")
 cQry += "   AND SB8.B8_PRODUTO BETWEEN '" + mv_par07 + "' AND '" + mv_par08 + "' "
 cQry += "   AND SB1.B1_GRUPO BETWEEN '" + mv_par05 + "' AND '" + mv_par06 + "' "
 cQry += "   AND SB8.B8_DTVALID BETWEEN '" + DtoS(mv_par09) + "' AND '" + DtoS(mv_par10) + "' "
 cQry += "   AND SB1.B1_RASTRO IN ('L','S') "
 cQry += "   AND " + cCondOrg + " "
 cQry += "   AND SB8.D_E_L_E_T_ = ' ' "
-cQry += " ORDER BY SB8.B8_PRODUTO, SB8.B8_LOCAL, SB8.B8_LOTECTL, SB8.B8_NUMLOTE, SB8.B8_DATA "
+cQry += " ORDER BY SB8.B8_FILIAL, SB8.B8_PRODUTO, SB8.B8_LOCAL, SB8.B8_LOTECTL, SB8.B8_NUMLOTE, SB8.B8_DATA "
 
 DbUseArea(.T., "TOPCONN", TcGenQry(, , ChangeQuery(cQry)), cAlias, .F., .T.)
 TcSetField(cAlias, "DTVALID" , "D", 8, 0)
 TcSetField(cAlias, "DTFABRIC", "D", 8, 0)
-TcSetField(cAlias, "EMAX"    , "N", TamSX3("B1_EMAX")[1], TamSX3("B1_EMAX")[2])
+//-- Reativar junto com a coluna B1_EMAX no SELECT acima
+// TcSetField(cAlias, "EMAX"    , "N", TamSX3("B1_EMAX")[1], TamSX3("B1_EMAX")[2])
 
 While !(cAlias)->(Eof()) .And. !oReport:Cancel()
 
+	//-- Medidor por filial: a consulta vem ordenada por filial
+	If (cAlias)->FILIAL <> cFilAtu
+		cFilAtu := (cAlias)->FILIAL
+		oReport:IncMeter()
+	EndIf
+
 	lSubLote := (cAlias)->RASTRO == "S"
-	cChave   := fChave((cAlias)->PRODUTO, (cAlias)->ARMAZEM, (cAlias)->LOTE, If(lSubLote, (cAlias)->SUBLOTE, ""))
+	cSubChv  := ""
+	If lSubLote
+		cSubChv := (cAlias)->SUBLOTE
+	EndIf
+	cChave := fChave((cAlias)->FILIAL, (cAlias)->PRODUTO, (cAlias)->ARMAZEM, (cAlias)->LOTE, cSubChv)
 
 	//-- Rastro por lote pode ter mais de um SB8 para o mesmo lote: usa o primeiro (entrada mais antiga)
 	If cChave <> cChvAnt
@@ -750,28 +784,36 @@ While !(cAlias)->(Eof()) .And. !oReport:Cancel()
 EndDo
 (cAlias)->(DbCloseArea())
 
-//-- 2) Produtos controlados sem rastro: um registro por Produto + Armazém (validade não se aplica)
-cAlias := GetNextAlias()
-cQry := "SELECT SB2.B2_COD PRODUTO, SB2.B2_LOCAL ARMAZEM, "
-cQry += "       SB1.B1_DESC DESCRI, SB1.B1_UM UM, SB1.B1_RASTRO RASTRO, SB1.B1_EMAX EMAX "
+//-- 2) Produtos controlados sem rastro: um registro por Filial + Produto + Armazém (validade não se aplica)
+cAlias  := GetNextAlias()
+cFilAtu := ""
+cQry := "SELECT SB2.B2_FILIAL FILIAL, SB2.B2_COD PRODUTO, SB2.B2_LOCAL ARMAZEM, "
+//-- B1_EMAX fora do cursor: o limite vem do fLimEst (ver nota na consulta da SB8)
+// cQry += "       SB1.B1_DESC DESCRI, SB1.B1_UM UM, SB1.B1_RASTRO RASTRO, SB1.B1_EMAX EMAX "
+cQry += "       SB1.B1_DESC DESCRI, SB1.B1_UM UM, SB1.B1_RASTRO RASTRO "
 cQry += "  FROM " + RetSqlName("SB2") + " SB2 "
-cQry += " INNER JOIN " + RetSqlName("SB1") + " SB1 ON SB1.B1_FILIAL = '" + xFilial("SB1") + "' "
+cQry += " INNER JOIN " + RetSqlName("SB1") + " SB1 ON " + fFilJoin("SB1", "SB1.B1_FILIAL", "SB2.B2_FILIAL")
 cQry += "       AND SB1.B1_COD = SB2.B2_COD AND SB1.D_E_L_E_T_ = ' ' "
-cQry += "  LEFT JOIN " + RetSqlName("SB5") + " SB5 ON SB5.B5_FILIAL = '" + xFilial("SB5") + "' "
+cQry += "  LEFT JOIN " + RetSqlName("SB5") + " SB5 ON " + fFilJoin("SB5", "SB5.B5_FILIAL", "SB2.B2_FILIAL")
 cQry += "       AND SB5.B5_COD = SB2.B2_COD AND SB5.D_E_L_E_T_ = ' ' "
-cQry += " WHERE SB2.B2_FILIAL = '" + xFilial("SB2") + "' "
+cQry += " WHERE " + fFilCond("SB2", "SB2.B2_FILIAL")
 cQry += "   AND SB2.B2_COD BETWEEN '" + mv_par07 + "' AND '" + mv_par08 + "' "
 cQry += "   AND SB1.B1_GRUPO BETWEEN '" + mv_par05 + "' AND '" + mv_par06 + "' "
 cQry += "   AND SB1.B1_RASTRO NOT IN ('L','S') "
 cQry += "   AND " + cCondOrg + " "
 cQry += "   AND SB2.D_E_L_E_T_ = ' ' "
-cQry += " ORDER BY SB2.B2_COD, SB2.B2_LOCAL "
+cQry += " ORDER BY SB2.B2_FILIAL, SB2.B2_COD, SB2.B2_LOCAL "
 
 DbUseArea(.T., "TOPCONN", TcGenQry(, , ChangeQuery(cQry)), cAlias, .F., .T.)
-TcSetField(cAlias, "EMAX", "N", TamSX3("B1_EMAX")[1], TamSX3("B1_EMAX")[2])
+//-- Reativar junto com a coluna B1_EMAX no SELECT acima
+// TcSetField(cAlias, "EMAX", "N", TamSX3("B1_EMAX")[1], TamSX3("B1_EMAX")[2])
 
 While !(cAlias)->(Eof()) .And. !oReport:Cancel()
-	cChave := fChave((cAlias)->PRODUTO, (cAlias)->ARMAZEM, "", "")
+	If (cAlias)->FILIAL <> cFilAtu
+		cFilAtu := (cAlias)->FILIAL
+		oReport:IncMeter()
+	EndIf
+	cChave := fChave((cAlias)->FILIAL, (cAlias)->PRODUTO, (cAlias)->ARMAZEM, "", "")
 	oDiag["LIDOS"] += 1
 	oItem  := fMontaItem(cAlias, .F., .F., oMov, cChave, aOrgaos, aListas, oCfg, oCache, oDiag)
 	If ValType(oItem) $ "O/J"   //-- JsonObject retorna "J"
@@ -789,10 +831,96 @@ FreeObj(oCache)
 
 Return
 
+/*/{Protheus.doc} fFilCond
+Condição SQL do intervalo de filiais (MV_PAR01 a MV_PAR02) para a tabela informada,
+respeitando o modo de compartilhamento do dicionário (FWModeAccess, nível 3).
+
+Tabela EXCLUSIVA por filial: o registro guarda a própria filial, então o recorte é
+"campo BETWEEN filial_de AND filial_ate" - os parâmetros entram direto na consulta.
+
+Tabela COMPARTILHADA: a filial não é gravada no registro (fica em branco), e o único
+filtro válido é o próprio xFilial da tabela. Aplicar o BETWEEN nesse caso descartaria
+todas as linhas, porque branco não está entre os códigos de filial.
+@type Function
+@author Pablo Regis
+@since  10/11/2026
+@param cAlias, character, alias da tabela (ex.: "SB8")
+@param cCampo, character, coluna de filial, qualificada ou não (ex.: "SB8.B8_FILIAL")
+@return character, condição SQL
+/*/
+Static Function fFilCond(cAlias, cCampo)
+
+Local cRet := ""
+
+If AllTrim(FWModeAccess(cAlias, 3)) == "C"
+	cRet := cCampo + " = '" + xFilial(cAlias) + "' "
+Else
+	cRet := cCampo + " BETWEEN '" + PadR(mv_par01, FWSizeFilial()) + "' AND '" + ;
+	        PadR(mv_par02, FWSizeFilial()) + "' "
+EndIf
+
+Return cRet
+
+/*/{Protheus.doc} fFilJoin
+Condição de filial de uma tabela de apoio dentro do JOIN, amarrada à filial do registro
+que comanda a consulta.
+
+Tabela EXCLUSIVA: amarra na coluna de filial da tabela principal, para que cada registro
+busque o cadastro da SUA filial, e não o de uma filial fixa.
+Tabela COMPARTILHADA: o cadastro vale para a empresa toda, então vale o xFilial.
+@type Function
+@author Pablo Regis
+@since  10/11/2026
+@param cAlias, character, alias da tabela de apoio (ex.: "SB1")
+@param cCampo, character, coluna de filial da tabela de apoio (ex.: "SB1.B1_FILIAL")
+@param cCpoOrig, character, coluna de filial da tabela principal (ex.: "SB8.B8_FILIAL")
+@return character, condição SQL
+/*/
+Static Function fFilJoin(cAlias, cCampo, cCpoOrig)
+
+Local cRet := ""
+
+If AllTrim(FWModeAccess(cAlias, 3)) == "C"
+	cRet := cCampo + " = '" + xFilial(cAlias) + "' "
+Else
+	cRet := cCampo + " = " + cCpoOrig + " "
+EndIf
+
+Return cRet
+
+/*/{Protheus.doc} fJoinB1
+JOIN da SB1 das consultas de movimento: filtro de grupo de produto e filial amarrada à
+filial do movimento (fFilJoin).
+@type Function
+@author Pablo Regis
+@since  10/11/2026
+@param cCpoFil, character, coluna de filial do movimento (ex.: "SD1.D1_FILIAL")
+@param cCpoCod, character, coluna de produto do movimento (ex.: "SD1.D1_COD")
+@return character, trecho SQL do JOIN
+/*/
+Static Function fJoinB1(cCpoFil, cCpoCod)
+
+Local cRet := ""
+
+cRet := " INNER JOIN " + RetSqlName("SB1") + " SB1 ON " + fFilJoin("SB1", "SB1.B1_FILIAL", cCpoFil)
+cRet += "       AND SB1.D_E_L_E_T_ = ' ' "
+cRet += "       AND SB1.B1_GRUPO BETWEEN '" + mv_par05 + "' AND '" + mv_par06 + "' "
+cRet += "       AND SB1.B1_COD = " + cCpoCod + " "
+
+Return cRet
+
 /*/{Protheus.doc} fCarregaMov
-Movimentos do período da filial corrente, agregados por Produto + Armazém + Lote + Sub-Lote
-e classificados em Compras / Consumo / Perdas-Transferências (MIT041 - seção 6).
-Retorna JsonObject: chave -> {nCompras, nConsumo, nPerdas}.
+Movimentos do período no intervalo de filiais, agregados por Filial + Produto + Armazém +
+Lote + Sub-Lote e classificados em Compras / Consumo / Perdas-Transferências (MIT041 -
+seção 6). Retorna JsonObject: chave -> {nCompras, nConsumo, nPerdas}.
+
+O recorte de filial de cada tabela de movimento sai de fFilCond (BETWEEN nos parâmetros
+para tabela exclusiva), e a filial entra na chave para que o movimento de uma filial não
+seja somado ao saldo de outra.
+@type Function
+@author Pablo Regis
+@since  21/10/2026
+@return object, JsonObject com os movimentos agregados
 /*/
 Static Function fCarregaMov()
 
@@ -808,9 +936,12 @@ Local cTmPerda  := fSqlIn(TM_PERDAS)
 Local cPerdaD3  := ""
 Local cProdD3   := ""
 Local cWhereD3  := ""
-Local cJoinB1   := ""
 Local lWmsNew   := SuperGetMv("MV_WMSNEW", .F., .F.)
-Local lD3Servi  := IIf(lWmsNew, .F., GetMV("MV_D3SERVI", .F., "N") == "N")
+Local lD3Servi  := .F.
+
+If !lWmsNew
+	lD3Servi := GetMV("MV_D3SERVI", .F., "N") == "N"
+EndIf
 
 cPerdaD3 := "(D3_CF IN (" + cCfD3Tr + ") OR D3_TM IN (" + cTmPerda + "))"
 cProdD3  := "(D3_CF LIKE 'PR%' OR D3_CF LIKE 'ER%')"
@@ -821,21 +952,18 @@ If lD3Servi .And. IntDL()
 	cWhereD3 += " (D3_SERVIC <> '   ' AND D3_TM > '500' AND D3_LOCAL = '" + GetMvNNR("MV_CQ", "98") + "') ) "
 EndIf
 
-cJoinB1 := " INNER JOIN " + RetSqlName("SB1") + " SB1 ON SB1.B1_FILIAL = '" + xFilial("SB1") + "' AND SB1.D_E_L_E_T_ = ' ' "
-cJoinB1 += " AND SB1.B1_GRUPO BETWEEN '" + mv_par05 + "' AND '" + mv_par06 + "' AND SB1.B1_COD = "
-
-cQry := "SELECT COD, LOC, LOTE, SUBLOTE, SUM(COMPRAS) COMPRAS, SUM(CONSUMO) CONSUMO, SUM(PERDAS) PERDAS FROM ( "
+cQry := "SELECT FIL, COD, LOC, LOTE, SUBLOTE, SUM(COMPRAS) COMPRAS, SUM(CONSUMO) CONSUMO, SUM(PERDAS) PERDAS FROM ( "
 
 //-- SD1: compras (+), devolução de venda (- consumo), transferência recebida (- perdas/transf.)
-cQry += "SELECT D1_COD COD, D1_LOCAL LOC, D1_LOTECTL LOTE, D1_NUMLOTE SUBLOTE, "
+cQry += "SELECT D1_FILIAL FIL, D1_COD COD, D1_LOCAL LOC, D1_LOTECTL LOTE, D1_NUMLOTE SUBLOTE, "
 cQry += "  CASE WHEN D1_TIPO <> 'D' AND D1_CF NOT IN (" + cCfTrE + ") THEN D1_QUANT ELSE 0 END COMPRAS, "
 cQry += "  CASE WHEN D1_TIPO = 'D' THEN -D1_QUANT ELSE 0 END CONSUMO, "
 cQry += "  CASE WHEN D1_TIPO <> 'D' AND D1_CF IN (" + cCfTrE + ") THEN -D1_QUANT ELSE 0 END PERDAS "
 cQry += "  FROM " + RetSqlName("SD1") + " SD1 "
-cQry += " INNER JOIN " + RetSqlName("SF4") + " SF4 ON SF4.F4_FILIAL = '" + xFilial("SF4") + "' "
+cQry += " INNER JOIN " + RetSqlName("SF4") + " SF4 ON " + fFilJoin("SF4", "SF4.F4_FILIAL", "SD1.D1_FILIAL")
 cQry += "       AND SF4.F4_CODIGO = SD1.D1_TES AND SF4.F4_ESTOQUE = 'S' AND SF4.D_E_L_E_T_ = ' ' "
-cQry += cJoinB1 + "SD1.D1_COD "
-cQry += " WHERE SD1.D1_FILIAL = '" + xFilial("SD1") + "' "
+cQry += fJoinB1("SD1.D1_FILIAL", "SD1.D1_COD")
+cQry += " WHERE " + fFilCond("SD1", "SD1.D1_FILIAL")
 cQry += "   AND SD1.D1_DTDIGIT BETWEEN '" + cIni + "' AND '" + cFim + "' "
 cQry += "   AND SD1.D1_COD BETWEEN '" + mv_par07 + "' AND '" + mv_par08 + "' "
 cQry += "   AND SD1.D1_ORIGLAN <> 'LF' AND SD1.D_E_L_E_T_ = ' ' "
@@ -843,15 +971,15 @@ cQry += "   AND SD1.D1_ORIGLAN <> 'LF' AND SD1.D_E_L_E_T_ = ' ' "
 cQry += "UNION ALL "
 
 //-- SD2: vendas (+ consumo), devolução de compra (- compras), transferência enviada (+ perdas/transf.)
-cQry += "SELECT D2_COD COD, D2_LOCAL LOC, D2_LOTECTL LOTE, D2_NUMLOTE SUBLOTE, "
+cQry += "SELECT D2_FILIAL FIL, D2_COD COD, D2_LOCAL LOC, D2_LOTECTL LOTE, D2_NUMLOTE SUBLOTE, "
 cQry += "  CASE WHEN D2_TIPO = 'D' THEN -D2_QUANT ELSE 0 END COMPRAS, "
 cQry += "  CASE WHEN D2_TIPO <> 'D' AND D2_CF NOT IN (" + cCfTrS + ") THEN D2_QUANT ELSE 0 END CONSUMO, "
 cQry += "  CASE WHEN D2_TIPO <> 'D' AND D2_CF IN (" + cCfTrS + ") THEN D2_QUANT ELSE 0 END PERDAS "
 cQry += "  FROM " + RetSqlName("SD2") + " SD2 "
-cQry += " INNER JOIN " + RetSqlName("SF4") + " SF4 ON SF4.F4_FILIAL = '" + xFilial("SF4") + "' "
+cQry += " INNER JOIN " + RetSqlName("SF4") + " SF4 ON " + fFilJoin("SF4", "SF4.F4_FILIAL", "SD2.D2_FILIAL")
 cQry += "       AND SF4.F4_CODIGO = SD2.D2_TES AND SF4.F4_ESTOQUE = 'S' AND SF4.D_E_L_E_T_ = ' ' "
-cQry += cJoinB1 + "SD2.D2_COD "
-cQry += " WHERE SD2.D2_FILIAL = '" + xFilial("SD2") + "' "
+cQry += fJoinB1("SD2.D2_FILIAL", "SD2.D2_COD")
+cQry += " WHERE " + fFilCond("SD2", "SD2.D2_FILIAL")
 cQry += "   AND SD2.D2_EMISSAO BETWEEN '" + cIni + "' AND '" + cFim + "' "
 cQry += "   AND SD2.D2_COD BETWEEN '" + mv_par07 + "' AND '" + mv_par08 + "' "
 cQry += "   AND SD2.D2_ORIGLAN <> 'LF' AND SD2.D_E_L_E_T_ = ' ' "
@@ -859,21 +987,21 @@ cQry += "   AND SD2.D2_ORIGLAN <> 'LF' AND SD2.D_E_L_E_T_ = ' ' "
 cQry += "UNION ALL "
 
 //-- SD3: produção (+ compras/entradas), transferências e TMs de perda (perdas/transf.), demais (consumo)
-cQry += "SELECT D3_COD COD, D3_LOCAL LOC, D3_LOTECTL LOTE, D3_NUMLOTE SUBLOTE, "
+cQry += "SELECT D3_FILIAL FIL, D3_COD COD, D3_LOCAL LOC, D3_LOTECTL LOTE, D3_NUMLOTE SUBLOTE, "
 cQry += "  CASE WHEN D3_CF LIKE 'PR%' THEN D3_QUANT WHEN D3_CF LIKE 'ER%' THEN -D3_QUANT ELSE 0 END COMPRAS, "
 cQry += "  CASE WHEN NOT " + cProdD3 + " AND NOT " + cPerdaD3
 cQry += "       THEN (CASE WHEN D3_TM > '500' THEN D3_QUANT ELSE -D3_QUANT END) ELSE 0 END CONSUMO, "
 cQry += "  CASE WHEN NOT " + cProdD3 + " AND " + cPerdaD3
 cQry += "       THEN (CASE WHEN D3_TM > '500' THEN D3_QUANT ELSE -D3_QUANT END) ELSE 0 END PERDAS "
 cQry += "  FROM " + RetSqlName("SD3") + " SD3 "
-cQry += cJoinB1 + "SD3.D3_COD "
-cQry += " WHERE SD3.D3_FILIAL = '" + xFilial("SD3") + "' "
+cQry += fJoinB1("SD3.D3_FILIAL", "SD3.D3_COD")
+cQry += " WHERE " + fFilCond("SD3", "SD3.D3_FILIAL")
 cQry += "   AND SD3.D3_EMISSAO BETWEEN '" + cIni + "' AND '" + cFim + "' "
 cQry += "   AND SD3.D3_COD BETWEEN '" + mv_par07 + "' AND '" + mv_par08 + "' "
 cQry += "   AND SD3.D3_ESTORNO <> 'S' AND SD3.D_E_L_E_T_ = ' ' "
 cQry += cWhereD3
 
-cQry += ") MOV GROUP BY COD, LOC, LOTE, SUBLOTE "
+cQry += ") MOV GROUP BY FIL, COD, LOC, LOTE, SUBLOTE "
 
 DbUseArea(.T., "TOPCONN", TcGenQry(, , ChangeQuery(cQry)), cAlias, .F., .T.)
 TcSetField(cAlias, "COMPRAS", "N", 18, 4)
@@ -881,7 +1009,7 @@ TcSetField(cAlias, "CONSUMO", "N", 18, 4)
 TcSetField(cAlias, "PERDAS" , "N", 18, 4)
 
 While !(cAlias)->(Eof())
-	oMov[fChave((cAlias)->COD, (cAlias)->LOC, (cAlias)->LOTE, (cAlias)->SUBLOTE)] := ;
+	oMov[fChave((cAlias)->FIL, (cAlias)->COD, (cAlias)->LOC, (cAlias)->LOTE, (cAlias)->SUBLOTE)] := ;
 		{(cAlias)->COMPRAS, (cAlias)->CONSUMO, (cAlias)->PERDAS}
 	(cAlias)->(DbSkip())
 EndDo
@@ -890,12 +1018,23 @@ EndDo
 Return oMov
 
 /*/{Protheus.doc} fMontaItem
-Calcula o balanço do item e reúne as informações regulatórias. Retorna Nil quando
-não há saldo nem movimento no período.
+Calcula o balanço do item e reúne as informações regulatórias. Retorna Nil quando não há
+saldo nem movimento no período.
+
+A filial sai do próprio registro (coluna FILIAL do cursor) e é atribuída a cFilAnt antes
+de qualquer cálculo: CalcEst/CalcEstL não recebem filial por parâmetro, sempre trabalham
+na filial corrente. As buscas de cadastro usam FWxFilial(tabela, filial), que já resolve
+o compartilhamento. Registro de tabela compartilhada vem com a filial em branco; nesse
+caso vale a filial de referência que ReportPrint deixou em cFilAnt.
+@type Function
+@author Pablo Regis
+@since  21/10/2026
+@return variant, JsonObject do item ou Nil quando não há saldo nem movimento
 /*/
 Static Function fMontaItem(cAlias, lLote, lSubLote, oMov, cChave, aOrgaos, aListas, oCfg, oCache, oDiag)
 
 Local oItem    := Nil
+Local cFil     := (cAlias)->FILIAL
 Local cProd    := (cAlias)->PRODUTO
 Local cLocal   := (cAlias)->ARMAZEM
 Local cLote    := ""
@@ -906,27 +1045,36 @@ Local nSis     := 0
 Local nFim     := 0
 Local cEstMat  := ""
 Local cControl := ""
-Local xLimite  := Nil
+
+//-- Tabela compartilhada: o registro não tem filial própria, vale a de referência
+If Empty(cFil)
+	cFil := cFilAnt
+EndIf
+
+//-- CalcEst/CalcEstL e xFilial() trabalham sempre na filial corrente
+cFilAnt := cFil
 
 If ValType(aMov) <> "A"
 	aMov := {0, 0, 0}
 EndIf
 
 If lLote
-	cLote    := (cAlias)->LOTE
-	cSubLote := If(lSubLote, (cAlias)->SUBLOTE, Nil)
-	nIni     := CalcEstL(cProd, cLocal, mv_par03    , cLote, cSubLote)[1]
-	nSis     := CalcEstL(cProd, cLocal, mv_par04 + 1, cLote, cSubLote)[1]
+	cLote := (cAlias)->LOTE
+	If lSubLote
+		cSubLote := (cAlias)->SUBLOTE
+	EndIf
+	nIni  := CalcEstL(cProd, cLocal, mv_par03    , cLote, cSubLote)[1]
+	nSis  := CalcEstL(cProd, cLocal, mv_par04 + 1, cLote, cSubLote)[1]
 Else
-	nIni     := CalcEst(cProd, cLocal, mv_par03)[1]
-	nSis     := CalcEst(cProd, cLocal, mv_par04 + 1)[1]
+	nIni  := CalcEst(cProd, cLocal, mv_par03)[1]
+	nSis  := CalcEst(cProd, cLocal, mv_par04 + 1)[1]
 EndIf
 
 //-- Sem saldo e sem movimento no período: não imprime
 If nIni == 0 .And. nSis == 0 .And. aMov[1] == 0 .And. aMov[2] == 0 .And. aMov[3] == 0
 	oDiag["DESCART"] += 1
 	If Empty(oDiag["EXEMPLO"])
-		oDiag["EXEMPLO"] := cFilAnt + " / " + AllTrim(cProd) + " / " + cLocal + " / " + AllTrim(cLote) + ;
+		oDiag["EXEMPLO"] := cFil + " / " + AllTrim(cProd) + " / " + cLocal + " / " + AllTrim(cLote) + ;
 		                    " (Sld. " + DtoC(mv_par03) + " = " + cValToChar(nIni) + ;
 		                    ", Sld. " + DtoC(mv_par04 + 1) + " = " + cValToChar(nSis) + ")"
 	EndIf
@@ -936,17 +1084,16 @@ EndIf
 nFim := nIni + aMov[1] - aMov[2] - aMov[3]
 
 SB5->(DbSetOrder(1))
-SB5->(MsSeek(xFilial("SB5") + cProd))
+SB5->(MsSeek(FWxFilial("SB5", cFil) + cProd))
 
 //-- A lista da 344/98 fica na SB1 (B1_TPPROD), lida por fDescOrg junto com as flags da SB5
 SB1->(DbSetOrder(1))
-SB1->(MsSeek(xFilial("SB1") + cProd))
+SB1->(MsSeek(FWxFilial("SB1", cFil) + cProd))
 
 oItem := JsonObject():New()
-oItem["FILIAL"  ] := cFilAnt
-//-- [FORA DO LAYOUT] Código do produto, hoje sem coluna
-// oItem["PRODUTO" ] := cProd
-//-- Nome Comercial identifica o produto no layout (não há coluna de código)
+oItem["FILIAL"  ] := cFil
+oItem["PRODUTO" ] := cProd
+//-- Nome Comercial complementa a identificação do produto no layout
 oItem["NOMECOM" ] := fCpoSB5(oCfg["DESCPR"], "")
 If Empty(oItem["NOMECOM"])
 	oItem["NOMECOM"] := (cAlias)->DESCRI
@@ -964,12 +1111,7 @@ oItem["UM"      ] := (cAlias)->UM
 //-- Uma varredura só: a descrição dos órgãos e o indicador da coluna "Controlado?"
 oItem["ORGAO"   ] := fDescOrg(aOrgaos, aListas, @cControl)
 oItem["CONTROL" ] := cControl
-xLimite := fCpoSB5(CPO_LIMEST, Nil)
-If ValType(xLimite) == "N" .And. xLimite > 0
-	oItem["LIMEST"  ] := xLimite
-Else
-	oItem["LIMEST"  ] := (cAlias)->EMAX
-EndIf
+oItem["LIMEST"  ] := fLimEst(cFil, cProd, oCache)
 oItem["FDS"     ] := fCpoSB5(CPO_FDS, CPO_VAZIO)
 oItem["ARMAZEM" ] := cLocal
 //-- [FORA DO LAYOUT] Condição de guarda (B5_XARMAZ), ver CPO_ARMAZ nos #DEFINE
@@ -1026,9 +1168,9 @@ Static Function fImprime(oSecao, oItem)
 
 //-- Mesma ordem das células em ReportDef.
 //-- [FORA DO LAYOUT] Ao reativar uma coluna, acrescente o nome aqui na posição
-//-- correspondente: "PRODUTO", "SUBLOTE", "LOTEFOR", "ARMAZEN", "NFDOC", "NFSERIE",
+//-- correspondente: "SUBLOTE", "LOTEFOR", "ARMAZEN", "NFDOC", "NFSERIE",
 //-- "NFEMIS", "SLDSIS", "CONFERE".
-Local aCelulas := {"LINHA", "FILIAL", "CONTROL", "ORGAO", "LIMEST", "CODMAPA", "NOMECOM", "NOMEQUI", ;
+Local aCelulas := {"LINHA", "FILIAL", "CONTROL", "ORGAO", "LIMEST", "PRODUTO", "CODMAPA", "NOMECOM", "NOMEQUI", ;
                    "CAS", "FORMA", "FABRIC", "LOTE", "FDS", "ARMAZEM", "DTFABRIC", "DTVALID", "UM", ;
                    "SLDINI", "COMPRAS", "NFCOMPRA", "CONSUMO", "PERDAS", "SLDFIM", "RESP", "CONFER", "OBS"}
 Local nI       := 0
@@ -1080,6 +1222,68 @@ EndIf
 
 Return cRet
 
+/*/{Protheus.doc} fLimEst
+Limite de estoque do produto na filial informada: BZ_EMAX (SBZ - Produto x Filial) e, na
+falta dele, B1_EMAX (SB1 - Cadastro de Produtos).
+
+A SBZ guarda os parâmetros de estoque por filial, por isso tem precedência sobre a SB1,
+que vale para toda a empresa. É a mesma precedência que o padrão aplica no PCPA107
+("ISNULL(SBZ.BZ_EMAX, SB1.B1_EMAX)").
+
+A filial é parâmetro, e não a filial corrente: a emissão percorre várias filiais numa
+consulta só, então o limite tem de ser o da filial do registro. A chave de busca sai de
+FWxFilial(tabela, filial), que resolve o compartilhamento de cada tabela.
+
+"Não existir na SBZ" cobre dois casos: produto sem registro na tabela e registro com
+BZ_EMAX zerado. Limite zero é tratado como limite não informado, por isso a função cai
+para a SB1.
+
+As duas tabelas são tratadas como opcionais (fCampoTab): sem a tabela no ambiente ou sem
+o campo no dicionário, a etapa é apenas ignorada e a função devolve 0 em vez de derrubar
+a emissão.
+@type Function
+@author Pablo Regis
+@since  10/11/2026
+@param cFil, character, filial do registro (B8_FILIAL / B2_FILIAL)
+@param cProd, character, código do produto (B1_COD)
+@param oCache, object, JsonObject de cache da emissão (opcional)
+@return numeric, limite de estoque; 0 se nenhuma das duas tabelas informa o valor
+/*/
+Static Function fLimEst(cFil, cProd, oCache)
+
+Local cChave  := ""
+Local nLimite := 0
+Local lCache  := ValType(oCache) $ "O/J"   //-- JsonObject retorna "J"
+
+cProd  := PadR(cProd, TamSX3("B1_COD")[1])
+cChave := "LIM|" + AllTrim(cFil) + "|" + AllTrim(cProd)
+
+//-- O mesmo produto se repete a cada lote/armazém: um seek por filial + produto, não por
+//-- linha. A filial entra na chave porque o limite da SBZ é por filial
+If lCache .And. ValType(oCache[cChave]) == "N"
+	Return oCache[cChave]
+EndIf
+
+//-- 1) Limite da filial (SBZ, índice 1 = BZ_FILIAL+BZ_COD)
+If !Empty(fCampoTab("BZ_EMAX", "SBZ", .T.))
+	nLimite := Posicione("SBZ", 1, FWxFilial("SBZ", cFil) + cProd, "BZ_EMAX")
+EndIf
+
+//-- 2) Limite geral do cadastro de produtos (SB1)
+If nLimite <= 0 .And. !Empty(fCampoTab("B1_EMAX", "SB1", .T.))
+	nLimite := Posicione("SB1", 1, FWxFilial("SB1", cFil) + cProd, "B1_EMAX")
+EndIf
+
+If ValType(nLimite) <> "N"
+	nLimite := 0
+EndIf
+
+If lCache
+	oCache[cChave] := nLimite
+EndIf
+
+Return nLimite
+
 /*/{Protheus.doc} fFabric
 Fabricante do lote via amarração Produto x Fornecedor (SA5) - MIT041, seção 5.
   CP: fornecedor do lote (B8_CLIFOR/B8_LOJA) | TR: fornecedor do lote de origem | PR: própria empresa.
@@ -1104,7 +1308,8 @@ Else
 	EndIf
 
 	If !Empty(cCliFor)
-		cChave := cProd + cCliFor + cLoja
+		//-- A filial entra na chave porque a SA5 pode ser exclusiva por filial
+		cChave := cFilAnt + "|" + cProd + cCliFor + cLoja
 		If ValType(oCache[cChave]) == "C"
 			cRet := oCache[cChave]
 		Else
@@ -1308,7 +1513,7 @@ Condição SQL do órgão: produto controlado (lControla = .T.) ou não controlado (.
 /*/
 Static Function fCondOrg(aOrg, lControla)
 
-//-- As duas queries do fProcFil usam SB5 e SB1 com esses mesmos apelidos
+//-- As duas queries do fProcessa usam SB5 e SB1 com esses mesmos apelidos
 Local cCampo := "COALESCE(" + aOrg[ORG_ALIAS] + "." + aOrg[ORG_CAMPO] + ",' ')"
 Local cRet   := ""
 
@@ -1541,10 +1746,23 @@ RestArea(aAreaSM0)
 Return cNome
 
 /*/{Protheus.doc} fChave
-Chave do item: Produto | Armazém | Lote | Sub-Lote.
+Chave do item: Filial | Produto | Armazém | Lote | Sub-Lote.
+
+A filial entra na chave porque a emissão percorre várias filiais numa consulta só: sem
+ela, o movimento de uma filial seria somado ao saldo de outra.
+@type Function
+@author Pablo Regis
+@since  21/10/2026
+@param cFil, character, filial do registro
+@param cProd, character, código do produto
+@param cLocal, character, armazém
+@param cLote, character, lote
+@param cSubLote, character, sub-lote
+@return character, chave do item
 /*/
-Static Function fChave(cProd, cLocal, cLote, cSubLote)
-Return AllTrim(cProd) + "|" + AllTrim(cLocal) + "|" + AllTrim(cLote) + "|" + AllTrim(cSubLote)
+Static Function fChave(cFil, cProd, cLocal, cLote, cSubLote)
+Return AllTrim(cFil) + "|" + AllTrim(cProd) + "|" + AllTrim(cLocal) + "|" + ;
+       AllTrim(cLote) + "|" + AllTrim(cSubLote)
 
 /*/{Protheus.doc} fSqlIn
 "A/B/C" -> "'A','B','C'" para cláusula IN.
