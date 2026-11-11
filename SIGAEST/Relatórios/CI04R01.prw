@@ -29,10 +29,12 @@ Parâmetros (ParamBox - não depende de SX1; respostas salvas no perfil do usuário
            por nenhum deles. Padrão: os 4 órgãos marcados e NC desmarcado
   MV_PAR12 Listas ANVISA            C  seleção múltipla via f_Opcoes: as 12 listas da
            Portaria SVS/MS 344/98 (A1, A2, A3, B1, B2, C1 a C5, D1, D2). Padrão: todas
-           marcadas. SÓ fica ativa para seleção quando a opção AV está marcada em
-           MV_PAR11 (When U_CI04AVM): sem a ANVISA no grupo de órgãos a pergunta não
-           tem efeito no recorte e por isso não é oferecida. Não tem opção NC - "não
-           controlado" é o NC de MV_PAR11, que nega os órgãos e as listas de uma vez
+           marcadas. Acompanha a opção AV de MV_PAR11 (CI04ORG): marcar a AV marca
+           todas as listas, porque ANVISA sem detalhe de lista significa "qualquer
+           lista", e desmarcar a AV desmarca todas, já que a pergunta deixa de entrar
+           na consulta. SÓ fica ativa para seleção com a AV marcada (When U_CI04AVM).
+           Não tem opção NC - "não controlado" é o NC de MV_PAR11, que nega os órgãos
+           e as listas de uma vez
 
 TUDO EM OU: as opções marcadas nas duas perguntas formam uma única condição unida por
 OR. Assim o relatório sai, numa mesma emissão, com PC + PF + EX + A1 + NC - os produtos
@@ -224,6 +226,15 @@ User Function (uma Static Function não é visível para o compilador de macros). O
 ParamBox informa o nome da variável da pergunta ao TGet (cReadVar), de modo que
 ReadVar() devolve "MV_PAR11" durante a validação.
 
+Esta validação mantém MV_PAR12 coerente com a ANVISA (fMarcaLis):
+  - AV recém-marcada: todas as listas são marcadas, que é o recorte representado pela
+    própria opção AV - qualquer lista da 344/98 - e deixa a pergunta pronta para quem
+    só precisa reduzir a seleção. Só na transição, para não desfazer a seleção parcial
+    de quem já escolheu as listas e voltou a esta pergunta;
+  - AV desmarcada: as listas são desmarcadas. Sem a ANVISA a pergunta não entra na
+    consulta (fValida), então deixá-la marcada anunciaria na tela um recorte que não
+    existe. Aqui não há seleção a preservar, por isso vale o estado e não a transição -
+    é o que também acerta o perfil gravado antes de a opção AV existir.
 @type Function
 @author Pablo Regis
 @since  05/11/2026
@@ -231,15 +242,55 @@ ReadVar() devolve "MV_PAR11" durante a validação.
 /*/
 User Function CI04ORG()
 
-Local aGrupo := fOrgaos()
+Local aGrupo  := fOrgaos()
+Local lAnvAnt := U_CI04AVM()
+Local lRet    := .F.
+
 //-- O NC nega todas as regras do grupo, ANVISA inclusive: é por ele que entram os
 //-- produtos sem nenhum controle, lado a lado com os órgãos marcados (tudo em OU)
-Local lRet   := fSelOpc(PAR_ORG, aGrupo, "Órgãos Fiscalizadores", .T., ;
-                        "NÃO CONTROLADO (FORA DE TODOS OS ÓRGÃOS E LISTAS)")
+lRet := fSelOpc(PAR_ORG, aGrupo, "Órgãos Fiscalizadores", .T., ;
+                "NÃO CONTROLADO (FORA DE TODOS OS ÓRGÃOS E LISTAS)")
+
+If !U_CI04AVM()
+	fMarcaLis(.F.)
+ElseIf !lAnvAnt
+	fMarcaLis(.T.)
+EndIf
 
 FwFreeArray(aGrupo)
 
 Return lRet
+
+/*/{Protheus.doc} fMarcaLis
+Marca ou desmarca todas as listas em MV_PAR12, acompanhando a opção AV de MV_PAR11.
+
+A pergunta guarda o próprio conteúdo na variável mv_par12, então gravar nela é o que a
+tela do f_Opcoes lê na próxima abertura e o que o ParamBox devolve na confirmação.
+Desmarcar é preencher todas as posições com "*", a mesma largura fixa das opções.
+@type Function
+@author Pablo Regis
+@since  11/11/2026
+@param lTudo, logical, .T. marca todas as listas; .F. desmarca todas
+@return nil
+/*/
+Static Function fMarcaLis(lTudo)
+
+Local aGrupo := {}
+Local cVar   := "mv_par" + StrZero(PAR_LIS, 2)
+Local cCont  := ""
+
+If Type(cVar) == "C"
+	If lTudo
+		cCont := fLisDef()
+	Else
+		aGrupo := fListas()
+		cCont  := Replicate("*", ORG_TAM * Len(aGrupo))
+		FwFreeArray(aGrupo)
+	EndIf
+	&(cVar) := cCont
+EndIf
+
+Return
 
 /*/{Protheus.doc} CI04LIS
 Validação da pergunta MV_PAR12 (Listas ANVISA): abre a seleção múltipla com o
