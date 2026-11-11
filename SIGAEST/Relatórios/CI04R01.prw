@@ -24,26 +24,30 @@ Parâmetros (ParamBox - não depende de SX1; respostas salvas no perfil do usuário
   MV_PAR08 Produto/Reagente até     C  tam. B1_COD   F3 SB1
   MV_PAR09 Validade de              D
   MV_PAR10 Validade até             D
-  MV_PAR11 Órgãos Fiscalizadores    C  seleção múltipla via f_Opcoes: Polícia Civil,
-           Polícia Federal, Exército e NC (não controlado por nenhum deles). A ANVISA
-           não entra aqui: marcar qualquer opção de MV_PAR12 já significa ANVISA.
-           Padrão: os 3 órgãos marcados e NC desmarcado
-  MV_PAR12 Listas ANVISA            C  FILTRO OPCIONAL, seleção múltipla via f_Opcoes:
-           as 12 listas da Portaria SVS/MS 344/98 (A1, A2, A3, B1, B2, C1 a C5, D1, D2)
-           e NC (produto fora de todas as listas). Padrão: todas marcadas.
-           Por ser opcional, nunca bloqueia a emissão: sem nada marcado, ou quando o
-           campo da lista não existe no dicionário, o relatório sai sem esse filtro
+  MV_PAR11 Órgãos Fiscalizadores    C  seleção múltipla via f_Opcoes: Polícia Civil
+           (PC), Polícia Federal (PF), Exército (EX), ANVISA (AV) e NC - não controlado
+           por nenhum deles. Padrão: os 4 órgãos marcados e NC desmarcado
+  MV_PAR12 Listas ANVISA            C  seleção múltipla via f_Opcoes: as 12 listas da
+           Portaria SVS/MS 344/98 (A1, A2, A3, B1, B2, C1 a C5, D1, D2). Padrão: todas
+           marcadas. SÓ fica ativa para seleção quando a opção AV está marcada em
+           MV_PAR11 (When U_CI04AVM): sem a ANVISA no grupo de órgãos a pergunta não
+           tem efeito no recorte e por isso não é oferecida. Não tem opção NC - "não
+           controlado" é o NC de MV_PAR11, que nega os órgãos e as listas de uma vez
 
-Nos dois parâmetros o conteúdo é a concatenação dos códigos de 2 posições, com "**" nas
-opções não marcadas (ex.: "PF**EX****" = Polícia Federal + Exército). Dentro de cada
-parâmetro as opções marcadas são unidas por OR; os dois parâmetros são unidos por AND,
-como qualquer outro par de filtros do relatório.
+TUDO EM OU: as opções marcadas nas duas perguntas formam uma única condição unida por
+OR. Assim o relatório sai, numa mesma emissão, com PC + PF + EX + A1 + NC - os produtos
+de cada órgão, os da lista A1 e os não controlados.
 
-Consequência do AND, decidida com o cliente: produto controlado SÓ pela ANVISA não sai
-com o padrão de MV_PAR11 (PC/PF/EX), porque não atende nenhum dos três órgãos. Para
-trazê-lo, marque também NC em MV_PAR11 - a condição vira "PC ou PF ou EX ou nenhum
-deles" e o recorte passa a ser feito só por MV_PAR12. O texto da opção NC na tela de
-seleção avisa isso ao usuário.
+O conteúdo de cada pergunta é a concatenação dos códigos de 2 posições, com "**" nas
+opções não marcadas (ex.: "PF**EX****" = Polícia Federal + Exército).
+
+A ANVISA é o único órgão com detalhamento próprio (ver fValida):
+  - AV marcada com todas, ou com nenhuma, das listas marcadas: vale a condição genérica
+    da opção AV - campo da lista preenchido, ou seja, produto em qualquer lista da
+    344/98 - e MV_PAR12 não entra na condição;
+  - AV marcada com parte das listas marcadas: a opção AV sai do grupo de órgãos e as
+    listas escolhidas tomam o seu lugar no OR, para que o recorte seja o pedido;
+  - AV desmarcada: a ANVISA fica fora do recorte e MV_PAR12 é ignorada.
 
 Flags de produto controlado na SB5 (configuração padrão TOTVS dos mapas):
   MV_PRODPF  -> campo da Polícia Federal  (ex.: B5_PRODPF)   - MATA950/MATR913
@@ -54,8 +58,8 @@ Opcionais (configuração PF): MV_DESCPR (nome comercial), MV_CODMAPA (cód. SIPROQ
 Lista da Portaria SVS/MS 344/98: campo PADRÃO SB1.B1_TPPROD (C 2), o mesmo que o
 MATR924 (Livro de Registro Específico) usa para separar os livros - 'A1', 'A2', 'A3',
 'B1', 'B2', 'C1' a 'C5', 'D1', 'D2'. É o único indicador de ANVISA usado pelo
-relatório: a flag B5_XANVISA deixou de ser consultada quando a opção ANVISA saiu do
-grupo de órgãos.
+relatório, tanto na opção AV dos órgãos quanto nas listas de MV_PAR12: a flag
+B5_XANVISA continua fora do fonte.
 
 As opções da pergunta MV_PAR12 vêm da tabela genérica SX5_LISTA da SX5 (a mesma do
 B1_TPPROD): lista nova ou descrição alterada no cadastro aparece sem recompilar.
@@ -70,11 +74,12 @@ resolvidos por fLimEst. O limite deixou de ter campo customizado na SB5.
 A coluna "Armazenamento / Storage" é o armazém do saldo (B8_LOCAL / B2_LOCAL), e não a
 condição de guarda: o B5_XARMAZ deixou de ser consultado quando a coluna de armazém
 recebeu esse rótulo.
-Todos são opcionais: campo inexistente na SB5 é impresso como "   ". No filtro, a
-opção cujo campo não existe é ignorada e registrada no diagnóstico - o resultado
-fica mais restrito, nunca mais abrangente. Mas se NENHUMA opção marcada tiver campo
-na SB5, a emissão é bloqueada: sem condição de órgão o relatório listaria todo o
-estoque como se fosse controlado.
+Todos são opcionais: campo inexistente no dicionário é impresso como "   ". No filtro, a
+opção cujo campo não existe é ignorada e registrada no diagnóstico - o resultado fica
+mais restrito, nunca mais abrangente. Nos Órgãos Fiscalizadores, se NENHUMA opção
+marcada tiver campo, a emissão é bloqueada: sem condição de órgão o relatório listaria
+todo o estoque como se fosse controlado. Nas Listas ANVISA, o grupo apenas deixa de
+entrar no OR.
 
 Colunas e campos que saíram do layout continuam no fonte, comentados e marcados com
 "[FORA DO LAYOUT]", para facilitar o retorno. São eles:
@@ -84,7 +89,8 @@ Colunas e campos que saíram do layout continuam no fonte, comentados e marcados 
   ARMAZEN (B5_XARMAZ)         o rótulo "Armazenamento" passou a designar o armazém
   NFDOC/NFSERIE/NFEMIS        consolidados na coluna de Notas Fiscais de Compra
   SLDSIS + CONFERE            checagem de divergência do saldo; nSis ainda é calculado
-  Opção AV (B5_XANVISA)       a ANVISA ganhou pergunta própria (MV_PAR12)
+  Flag B5_XANVISA             a opção AV voltou ao grupo de órgãos, mas identificada
+                              pelo campo da lista (B1_TPPROD); a flag segue fora
 Cada ponto traz, no comentário, o que precisa ser reativado junto.
 
 @type Function
@@ -99,8 +105,9 @@ Cada ponto traz, no comentário, o que precisa ser reativado junto.
 
 //-- [FORA DO LAYOUT] Campos que saíram do relatório, mantidos para eventual retorno.
 //-- Procure por "[FORA DO LAYOUT]" para achar todos os pontos envolvidos.
-//-- B5_XANVISA: flag de produto controlado pela ANVISA. Saiu quando a opção ANVISA deixou
-//--   o grupo de órgãos (MV_PAR11) - hoje quem identifica a ANVISA é o B1_TPPROD (MV_PAR12).
+//-- B5_XANVISA: flag de produto controlado pela ANVISA. A opção AV está no grupo de
+//--   órgãos (MV_PAR11), mas identificada pelo campo da lista (B1_TPPROD), que é o mesmo
+//--   indicador de MV_PAR12 - ver fOrgaos para o que trocar se a flag voltar a valer.
 // #DEFINE CPO_ANVISA   "B5_XANVISA"
 //-- B5_XARMAZ: condição de guarda do reagente ("manter refrigerado", "ao abrigo de luz").
 //--   Saiu quando o rótulo "Armazenamento" passou a designar o armazém (B8_LOCAL/B2_LOCAL).
@@ -125,7 +132,8 @@ Cada ponto traz, no comentário, o que precisa ser reativado junto.
 
 //-- Grupos de seleção múltipla (f_Opcoes): órgãos em MV_PAR11, listas da 344/98 em MV_PAR12
 #DEFINE ORG_TAM      2      //-- posições do código de cada opção
-#DEFINE ORG_NC       "NC"   //-- "não controlado": última opção de cada grupo, não é um órgão/lista
+#DEFINE ORG_NC       "NC"   //-- "não controlado": última opção do grupo de órgãos, não é um órgão
+#DEFINE ORG_AV       "AV"   //-- ANVISA: órgão cujo recorte pode ser detalhado pelas listas (MV_PAR12)
 #DEFINE PAR_ORG      11
 #DEFINE PAR_LIS      12
 #DEFINE QTD_PARAM    12
@@ -191,9 +199,10 @@ aAdd(aPergs, {1, "Produto/Reagente de" , Space(nTamPrd)          , "@!", "", "SB
 aAdd(aPergs, {1, "Produto/Reagente até", Replicate("Z", nTamPrd) , "@!", "", "SB1", "", 80, .T.})
 aAdd(aPergs, {1, "Validade de"         , StoD("19000101")        , ""  , "", ""   , "", 50, .T.})
 aAdd(aPergs, {1, "Validade até"        , StoD("29991231")        , ""  , "", ""   , "", 50, .T.})
-//-- Seleção múltipla pelo f_Opcoes: a validação de cada pergunta abre a tela de opções
-aAdd(aPergs, {1, "Órgãos Fiscalizadores", fOrgDef(), "@!", "U_CI04ORG()", "", "", 100, .T.})
-aAdd(aPergs, {1, "Listas ANVISA"        , fLisDef(), "@!", "U_CI04LIS()", "", "", 100, .F.})
+//-- Seleção múltipla pelo f_Opcoes: a validação de cada pergunta abre a tela de opções.
+//-- O When de MV_PAR12 (CI04AVM) só libera as listas com a ANVISA marcada em MV_PAR11
+aAdd(aPergs, {1, "Órgãos Fiscalizadores", fOrgDef(), "@!", "U_CI04ORG()", "", ""           , 100, .T.})
+aAdd(aPergs, {1, "Listas ANVISA"        , fLisDef(), "@!", "U_CI04LIS()", "", "U_CI04AVM()", 100, .F.})
 
 If ParamBox(aPergs, "Parâmetros - Reagentes Controlados", @aRet, , , .T., , , , NUM_PERG, .T., .T.)
 	For nI := 1 To QTD_PARAM
@@ -223,10 +232,10 @@ ReadVar() devolve "MV_PAR11" durante a validação.
 User Function CI04ORG()
 
 Local aGrupo := fOrgaos()
-//-- O texto do NC orienta quem procura produto controlado só pela ANVISA: como os dois
-//-- parâmetros se cruzam por AND, sem o NC aqui o produto só-ANVISA não entra no recorte
+//-- O NC nega todas as regras do grupo, ANVISA inclusive: é por ele que entram os
+//-- produtos sem nenhum controle, lado a lado com os órgãos marcados (tudo em OU)
 Local lRet   := fSelOpc(PAR_ORG, aGrupo, "Órgãos Fiscalizadores", .T., ;
-                        "NÃO CONTROLADO POR ESTES ÓRGÃOS (MARQUE PARA VER SÓ ANVISA)")
+                        "NÃO CONTROLADO (FORA DE TODOS OS ÓRGÃOS E LISTAS)")
 
 FwFreeArray(aGrupo)
 
@@ -235,20 +244,58 @@ Return lRet
 /*/{Protheus.doc} CI04LIS
 Validação da pergunta MV_PAR12 (Listas ANVISA): abre a seleção múltipla com o
 f_Opcoes. Vale aqui a mesma observação de CI04ORG sobre ser User Function.
+
+Sem a ANVISA marcada em MV_PAR11 a pergunta não tem efeito no recorte, então a tela de
+seleção não é aberta. O When da pergunta (CI04AVM) já impede o foco de chegar ao campo;
+esta checagem cobre o caso de o campo ser alcançado antes de o When ser reavaliado.
+
+O grupo das listas não tem opção NC e não é obrigatório: deixar tudo desmarcado vale
+como "qualquer lista", o mesmo efeito de deixar todas marcadas.
 @type Function
 @author Pablo Regis
 @since  05/11/2026
-@return logical, .T. se ao menos uma opção ficou marcada
+@return logical, .T. se o campo pode perder o foco
 /*/
 User Function CI04LIS()
 
-Local aGrupo := fListas()
-Local lRet   := fSelOpc(PAR_LIS, aGrupo, "Listas ANVISA - Portaria 344/98", .F., ;
-                        "NÃO CONTROLADO PELA ANVISA (FORA DE TODAS AS LISTAS)")
+Local aGrupo := {}
+Local lRet   := .T.
+
+If !U_CI04AVM()
+	Help(NIL, NIL, NUM_PERG, NIL, "As Listas ANVISA só valem com a ANVISA marcada em Órgãos Fiscalizadores.", 1, 0, NIL, NIL, NIL, NIL, NIL, ;
+	     {"Marque a opção AV - ANVISA na pergunta Órgãos Fiscalizadores."})
+	Return .T.
+EndIf
+
+aGrupo := fListas()
+lRet   := fSelOpc(PAR_LIS, aGrupo, "Listas ANVISA - Portaria 344/98", .F.)
 
 FwFreeArray(aGrupo)
 
 Return lRet
+
+/*/{Protheus.doc} CI04AVM
+.T. quando a ANVISA (opção AV) está marcada em MV_PAR11. É o When da pergunta MV_PAR12
+- daí ser User Function, pelo mesmo motivo de CI04ORG - e também a guarda da validação
+dessa pergunta.
+
+Lê o conteúdo da pergunta direto, sem montar o grupo de órgãos: o When é avaliado a cada
+tentativa de foco no campo, e remontar o grupo chamaria SuperGetMV e a validação dos
+campos no dicionário a cada passagem.
+@type Function
+@author Pablo Regis
+@since  11/11/2026
+@return logical, .T. se a ANVISA está marcada em Órgãos Fiscalizadores
+/*/
+User Function CI04AVM()
+
+Local cPar := ""
+
+If Type("mv_par" + StrZero(PAR_ORG, 2)) == "C"
+	cPar := &("mv_par" + StrZero(PAR_ORG, 2))
+EndIf
+
+Return fOrgPos(ORG_AV, cPar) > 0
 
 /*/{Protheus.doc} fSelOpc
 Abre o f_Opcoes para um grupo de opções e grava os códigos marcados na pergunta.
@@ -260,7 +307,7 @@ Usada pela validação das perguntas MV_PAR11 e MV_PAR12.
 @param aGrupo, array, grupo de opções (fOrgaos ou fListas)
 @param cTitulo, character, título da coluna de opções na tela do f_Opcoes
 @param lObrig, logical, .T. exige ao menos uma opção marcada para sair do campo
-@param cDescNC, character, descrição da opção NC na tela deste grupo
+@param cDescNC, character, descrição da opção NC na tela deste grupo (só nos órgãos)
 @return logical, .T. se o campo pode perder o foco
 /*/
 Static Function fSelOpc(nParam, aGrupo, cTitulo, lObrig, cDescNC)
@@ -276,11 +323,11 @@ If Empty(cVar)
 	cVar := "MV_PAR" + StrZero(nParam, 2)
 EndIf
 
-aOpcoes := fOpcGrp(aGrupo, @cCodigos, cDescNC)
+aOpcoes := fOpcGrp(aGrupo, @cCodigos, cDescNC, fTemNC(nParam))
 
 //-- Conteúdo atual: o f_Opcoes marca as opções já presentes na variável
 If Type(cVar) == "C"
-	cSel := &(cVar)
+	cSel := fLimpaSel(&(cVar), cCodigos)
 EndIf
 
 If f_Opcoes(@cSel, cTitulo, aOpcoes, cCodigos, , , .F., ORG_TAM, Len(aOpcoes))
@@ -299,6 +346,37 @@ EndIf
 FwFreeArray(aOpcoes)
 
 Return lRet
+
+/*/{Protheus.doc} fLimpaSel
+Conteúdo da pergunta alinhado às opções atuais do grupo: cada código válido é mantido
+na sua posição e as demais posições viram "**".
+
+Sem isso, perfil gravado por uma versão anterior do relatório desalinharia a marcação
+na tela do f_Opcoes - é o caso do NC que saiu do grupo das listas e do AV que entrou
+no grupo dos órgãos.
+@type Function
+@author Pablo Regis
+@since  11/11/2026
+@param cSel, character, conteúdo atual da pergunta
+@param cCodigos, character, concatenação dos códigos válidos (fOpcGrp)
+@return character, conteúdo alinhado ao grupo
+/*/
+Static Function fLimpaSel(cSel, cCodigos)
+
+Local cRet := ""
+Local cCod := ""
+Local nI   := 0
+
+For nI := 1 To Len(cCodigos) Step ORG_TAM
+	cCod := SubStr(cCodigos, nI, ORG_TAM)
+	If fOrgPos(cCod, cSel) > 0
+		cRet += cCod
+	Else
+		cRet += Replicate("*", ORG_TAM)
+	EndIf
+Next nI
+
+Return cRet
 
 /*/{Protheus.doc} ReportDef
 Definição do layout (colunas bilíngues PT/EN).
@@ -496,7 +574,7 @@ If oDiag["IMPRESSOS"] == 0 .And. !oReport:Cancel()
 	     "Registros lidos nas consultas: " + cValToChar(oDiag["LIDOS"]) + CRLF + ;
 	     "Descartados (sem saldo e sem movimento): " + cValToChar(oDiag["DESCART"]) + CRLF + ;
 	     "Exemplo descartado: " + oDiag["EXEMPLO"] + CRLF + ;
-	     "Grupos com opção fora do filtro (campo inexistente na SB5): " + oDiag["ORGIGN"] + CRLF + ;
+	     "Grupos com opção fora do filtro (campo inexistente no dicionário): " + oDiag["ORGIGN"] + CRLF + ;
 	     "Filtro de órgãos e listas: " + cCondOrg, ;
 	     1, 0, NIL, NIL, NIL, NIL, NIL, {"Revise os parâmetros e o cadastro dos produtos controlados."})
 EndIf
@@ -510,8 +588,23 @@ Return
 
 /*/{Protheus.doc} fValida
 Validação dos filtros obrigatórios (fluxo alternativo A1) e montagem da condição dos
-dois grupos de seleção. Cada grupo é resolvido por fCondGrp (opções unidas por OR) e
-os dois são unidos por AND, como qualquer outro par de filtros do relatório.
+dois grupos de seleção.
+
+TUDO EM OU: cada grupo é resolvido por fCondGrp (opções do grupo unidas por OR) e as
+duas condições também são unidas por OR. Assim PC, PF, EX, a lista A1 e os produtos não
+controlados (NC) saem na mesma emissão.
+
+A ANVISA é o único órgão com detalhamento próprio:
+  - AV marcada com todas, ou com nenhuma, das listas marcadas: vale a condição genérica
+    da opção AV (campo da lista preenchido = produto em qualquer lista da 344/98) e
+    MV_PAR12 não entra na condição;
+  - AV marcada com parte das listas marcadas: a opção AV sai do grupo de órgãos e as
+    listas escolhidas tomam o seu lugar no OR, para que o recorte seja o pedido;
+  - AV desmarcada: MV_PAR12 é ignorada.
+
+Quando a retirada da AV esvazia a seleção de órgãos (só a ANVISA estava marcada), o
+grupo de órgãos não entra na condição. Chamar fCondGrp com a seleção vazia devolveria
+"1 = 1" e, dentro de um OR, isso traria todo o estoque.
 @type Function
 @author Pablo Regis
 @since  21/10/2026
@@ -524,11 +617,18 @@ os dois são unidos por AND, como qualquer outro par de filtros do relatório.
 /*/
 Static Function fValida(aOrgaos, aListas, cCondOrg, cErro, cIgnora)
 
+Local aCond   := {}
 Local cOrg    := fSelGrp(PAR_ORG, aOrgaos)
 Local cLis    := fSelGrp(PAR_LIS, aListas)
 Local cCndOrg := ""
 Local cCndLis := ""
+Local nLis    := Len(cLis) / ORG_TAM
+Local lDetLis := .F.
 Local lRet    := .T.
+
+//-- As listas só detalham a ANVISA quando ela está marcada e a seleção é parcial:
+//-- todas marcadas (ou nenhuma) equivale a "qualquer lista", que é a própria opção AV
+lDetLis := fOrgPos(ORG_AV, cOrg) > 0 .And. nLis > 0 .And. nLis < Len(aListas)
 
 Do Case
 Case Empty(mv_par02)
@@ -559,25 +659,41 @@ EndCase
 
 lRet := Empty(cErro)
 
-//-- Uma condição por grupo; os dois grupos são unidos por AND
-If lRet
-	lRet := fCondGrp(aOrgaos, cOrg, "Órgãos Fiscalizadores", .T., @cCndOrg, @cErro, @cIgnora)
+//-- ANVISA detalhada por lista: a opção AV dá lugar às listas marcadas
+If lRet .And. lDetLis
+	cOrg := fTiraOpc(cOrg, ORG_AV)
+	lRet := fCondGrp(aListas, cLis, "Listas ANVISA", .F., .F., @cCndLis, @cErro, @cIgnora)
 EndIf
 
-//-- Listas ANVISA é filtro opcional: nunca bloqueia a emissão
-If lRet
-	lRet := fCondGrp(aListas, cLis, "Listas ANVISA", .F., @cCndLis, @cErro, @cIgnora)
+If lRet .And. !Empty(cOrg)
+	lRet := fCondGrp(aOrgaos, cOrg, "Órgãos Fiscalizadores", .T., .T., @cCndOrg, @cErro, @cIgnora)
 EndIf
 
+//-- Os dois grupos entram no mesmo OR; grupo sem condição aplicável não entra
 If lRet
-	cCondOrg := "(" + cCndOrg + " AND " + cCndLis + ")"
+	If !Empty(cCndOrg)
+		aAdd(aCond, cCndOrg)
+	EndIf
+	If !Empty(cCndLis)
+		aAdd(aCond, cCndLis)
+	EndIf
+	If Empty(aCond)
+		cErro := "Nenhuma opção marcada em Órgãos Fiscalizadores e Listas ANVISA tem campo " + ;
+		         "correspondente no dicionário." + CRLF + ;
+		         "Sem isso o relatório listaria todo o estoque no lugar do recorte pedido."
+		lRet  := .F.
+	Else
+		cCondOrg := "(" + fJunta(aCond, " OR ") + ")"
+	EndIf
 EndIf
+
+FwFreeArray(aCond)
 
 Return lRet
 
 /*/{Protheus.doc} fCpoOrg
 Pares "código=campo" de um grupo, para o log de diagnóstico. Campo vazio significa
-parâmetro não configurado ou campo inexistente na SB5 - ou seja, opção fora do filtro.
+parâmetro não configurado ou campo inexistente no dicionário - ou seja, opção fora do filtro.
 @type Function
 @author Pablo Regis
 @since  05/11/2026
@@ -602,17 +718,18 @@ Return cRet
 
 /*/{Protheus.doc} fCondGrp
 Condição SQL de um grupo de opções: as opções marcadas são unidas por OR e a opção NC
-nega todas as regras do grupo (produto fora dele).
+(só o grupo de órgãos a tem) nega todas as regras do grupo, trazendo o produto que não
+é controlado por nenhuma delas.
 
-Grupo sem nada marcado não filtra: a condição vira "1 = 1".
+Grupo com nada marcado, ou com tudo marcado, não restringe: a condição vira "1 = 1".
 
-Opção cujo campo não existe na SB5 sai da condição e o grupo é registrado em cIgnora -
-o resultado fica mais restrito, nunca mais abrangente. Se nenhuma opção marcada tiver
-campo, o critério é:
-  - grupo opcional (lObrig = .F.), ou todas as opções marcadas: a condição vira
-    "1 = 1" e o relatório sai sem esse filtro;
-  - grupo obrigatório com seleção parcial: aborta, porque "1 = 1" devolveria todo o
-    estoque no lugar do recorte pedido.
+Opção cujo campo não existe no dicionário sai da condição e o grupo é registrado em
+cIgnora - o resultado fica mais restrito, nunca mais abrangente. Se nenhuma opção
+marcada tiver campo, o critério é:
+  - grupo obrigatório (lObrig = .T., os órgãos): aborta, porque "1 = 1" devolveria todo
+    o estoque no lugar do recorte pedido;
+  - grupo opcional (as listas, que entram em OR com os órgãos): devolve condição vazia e
+    o grupo fica fora do OR. "1 = 1" aqui anularia o filtro inteiro.
 @type Function
 @author Pablo Regis
 @since  05/11/2026
@@ -620,12 +737,13 @@ campo, o critério é:
 @param cSel, character, códigos marcados (fSelGrp)
 @param cGrupo, character, nome do grupo para as mensagens
 @param lObrig, logical, .T. aborta quando o recorte pedido não pode ser aplicado
+@param lTemNC, logical, .T. se o grupo oferece a opção NC (ver fTemNC)
 @param cCond, character, retorna a condição SQL do grupo (por referência)
 @param cErro, character, retorna a mensagem de erro (por referência)
 @param cIgnora, character, acumula os grupos com opção fora do filtro (por referência)
 @return logical, .T. se a condição pôde ser montada
 /*/
-Static Function fCondGrp(aGrupo, cSel, cGrupo, lObrig, cCond, cErro, cIgnora)
+Static Function fCondGrp(aGrupo, cSel, cGrupo, lObrig, lTemNC, cCond, cErro, cIgnora)
 
 Local aCond := {}
 Local aNeg  := {}
@@ -633,8 +751,14 @@ Local cCod  := ""
 Local nI    := 0
 Local nPos  := 0
 Local nSel  := Len(cSel) / ORG_TAM
+Local nTot  := Len(aGrupo)
 Local lIgn  := .F.
 Local lRet  := .T.
+
+//-- Total de opções da tela, para reconhecer a seleção completa
+If lTemNC
+	nTot += 1
+EndIf
 
 For nI := 1 To Len(cSel) Step ORG_TAM
 	If !lRet
@@ -660,7 +784,7 @@ For nI := 1 To Len(cSel) Step ORG_TAM
 			cErro := "Código inválido em " + cGrupo + ": " + cCod + "."
 			lRet  := .F.
 		ElseIf Empty(aGrupo[nPos][ORG_CAMPO])
-			//-- Campo inexistente na SB5 (ou parâmetro vazio): a opção sai do filtro
+			//-- Campo inexistente no dicionário (ou parâmetro vazio): a opção sai do filtro
 			lIgn := .T.
 		Else
 			aAdd(aCond, fCondOrg(aGrupo[nPos], .T.))
@@ -672,9 +796,12 @@ If lRet
 	Do Case
 	Case !Empty(aCond)
 		cCond := "(" + fJunta(aCond, " OR ") + ")"
-	Case !lObrig .Or. Empty(cSel) .Or. nSel >= (Len(aGrupo) + 1)
-		//-- Grupo opcional, nada marcado ou tudo marcado: não restringe nada
+	Case Empty(cSel) .Or. nSel >= nTot
+		//-- Nada marcado ou tudo marcado: não restringe nada
 		cCond := "(1 = 1)"
+	Case !lObrig
+		//-- Nenhuma opção marcada tem campo: o grupo não contribui com o OR
+		cCond := ""
 	OtherWise
 		cErro := "Nenhuma opção marcada em " + cGrupo + " tem campo correspondente no dicionário." + CRLF + ;
 		         "Sem isso o relatório listaria todo o estoque no lugar do recorte pedido."
@@ -1372,23 +1499,31 @@ EndIf
 Return
 
 /*/{Protheus.doc} fOrgaos
-Grupo da pergunta MV_PAR11 - órgãos fiscalizadores: código, descrição, campo na SB5,
-parâmetro de origem e regra (flag = 'S').
-A ANVISA não entra aqui: marcar qualquer opção da pergunta MV_PAR12 já significa
-produto controlado pela ANVISA.
+Grupo da pergunta MV_PAR11 - órgãos fiscalizadores: código, descrição, campo, parâmetro
+de origem e regra de controle (flag = 'S' nos três primeiros, campo preenchido na ANVISA).
+
+A ANVISA entra aqui como qualquer outro órgão, mas pelo campo da lista da Portaria
+344/98 (fCampoLis, SB1.B1_TPPROD): produto com lista preenchida é produto controlado
+pela ANVISA. A pergunta MV_PAR12 apenas detalha quais listas interessam e só é
+oferecida quando esta opção está marcada (ver CI04AVM).
+@type Function
+@author Pablo Regis
+@since  21/10/2026
+@return array, grupo de opções dos órgãos fiscalizadores
 /*/
 Static Function fOrgaos()
 
 Local aOrgaos := {}
 
-aAdd(aOrgaos, {"PC", "POLÍCIA CIVIL"  , fCampoMV("MV_MTR947A")      , "MV_MTR947A", .F., "", "SB5"})
-aAdd(aOrgaos, {"PF", "POLÍCIA FEDERAL", fCampoMV("MV_PRODPF")       , "MV_PRODPF" , .F., "", "SB5"})
-aAdd(aOrgaos, {"EX", "EXÉRCITO"       , fCampoMV("MV_MTR949A")      , "MV_MTR949A", .F., "", "SB5"})
-//-- [FORA DO LAYOUT] Opção ANVISA pela flag B5_XANVISA (ver CPO_ANVISA nos #DEFINE).
-//-- Saiu porque a ANVISA ganhou pergunta própria (MV_PAR12, listas da 344/98). Reativar
-//-- aqui faria a flag voltar ao filtro de órgãos e às colunas "Órgão Fiscalizador" e
-//-- "Controlado", convivendo com as listas.
-// aAdd(aOrgaos, {"AV", "ANVISA"         , fCampoSB5(CPO_ANVISA, .T.)  , ""          , .T., "", "SB5"})
+aAdd(aOrgaos, {"PC"  , "POLÍCIA CIVIL"           , fCampoMV("MV_MTR947A"), "MV_MTR947A", .F., "", "SB5"})
+aAdd(aOrgaos, {"PF"  , "POLÍCIA FEDERAL"         , fCampoMV("MV_PRODPF") , "MV_PRODPF" , .F., "", "SB5"})
+aAdd(aOrgaos, {"EX"  , "EXÉRCITO"                , fCampoMV("MV_MTR949A"), "MV_MTR949A", .F., "", "SB5"})
+aAdd(aOrgaos, {ORG_AV, "ANVISA", fCampoLis()           , PAR_LISTA   , .T., "", TAB_LISTA})
+//-- [FORA DO LAYOUT] Flag B5_XANVISA (CPO_ANVISA nos #DEFINE) como campo da opção AV.
+//-- Hoje a ANVISA é identificada pelo campo da lista (B1_TPPROD), o mesmo indicador de
+//-- MV_PAR12 - um só critério para a opção AV e para as listas. Para voltar a usar a
+//-- flag, troque o campo da opção acima por fCampoSB5(CPO_ANVISA, .T.), reative o
+//-- #DEFINE e lembre que a lista deixa de detalhar a mesma informação.
 
 Return aOrgaos
 
@@ -1542,13 +1677,16 @@ EndCase
 Return cRet
 
 /*/{Protheus.doc} fDescOrg
-Órgãos e listas que controlam o produto posicionado na SB5 (flag = 'S', campo
-preenchido ou conteúdo igual ao código da lista da 344/98).
+Órgãos e listas que controlam o produto posicionado (flag = 'S' na SB5, campo
+preenchido ou conteúdo igual ao código da lista da 344/98 na SB1).
+
+Quando alguma lista se aplica, o código AV é dispensado: a lista já identifica a ANVISA
+e repetir os dois só consumiria a coluna (ex.: "PF / A1", e não "PF / AV / A1").
 
 Devolve também, por referência, o indicador da coluna "Controlado?": SIM quando ao
 menos um órgão/lista se aplica, NÃO quando nenhum se aplica e CPO_VAZIO quando não
-existe nenhum campo na SB5 - nesse caso o produto não é "não controlado", é um
-produto que o relatório não tem como classificar, e afirmar NÃO seria incorreto num
+existe nenhum dos campos no dicionário - nesse caso o produto não é "não controlado", é
+um produto que o relatório não tem como classificar, e afirmar NÃO seria incorreto num
 relatório regulatório.
 @type Function
 @author Pablo Regis
@@ -1561,15 +1699,30 @@ relatório regulatório.
 Static Function fDescOrg(aOrgaos, aListas, cControl)
 
 Local aDesc  := {}
+Local aLis   := {}
 Local cRet   := ""
 Local lCampo := .F.
+Local nI     := 0
+Local nPos   := 0
 
 fMarcGrp(aOrgaos, @aDesc, @lCampo)
-fMarcGrp(aListas, @aDesc, @lCampo)
+fMarcGrp(aListas, @aLis, @lCampo)
+
+If !Empty(aLis)
+	//-- A lista já diz que o produto é da ANVISA
+	nPos := aScan(aDesc, {|x| x == ORG_AV})
+	If nPos > 0
+		aDel(aDesc, nPos)
+		aSize(aDesc, Len(aDesc) - 1)
+	EndIf
+	For nI := 1 To Len(aLis)
+		aAdd(aDesc, aLis[nI])
+	Next nI
+EndIf
 
 Do Case
 Case !lCampo
-	//-- Sem campo de órgão nem de lista na SB5: não há como classificar o produto
+	//-- Sem campo de órgão nem de lista no dicionário: não há como classificar o produto
 	cRet     := CPO_VAZIO
 	cControl := CPO_VAZIO
 Case Empty(aDesc)
@@ -1580,6 +1733,7 @@ OtherWise
 	cControl := "SIM"
 EndCase
 
+FwFreeArray(aLis)
 FwFreeArray(aDesc)
 
 Return cRet
@@ -1817,7 +1971,7 @@ If Type(cVar) == "C"
 	cPar := &(cVar)
 EndIf
 
-aOpcoes := fOpcGrp(aGrupo, @cCodigos)
+aOpcoes := fOpcGrp(aGrupo, @cCodigos, , fTemNC(nParam))
 
 For nI := 1 To Len(cPar) Step ORG_TAM
 	cCod := SubStr(cPar, nI, ORG_TAM)
@@ -1830,24 +1984,67 @@ FwFreeArray(aOpcoes)
 
 Return cRet
 
+/*/{Protheus.doc} fTemNC
+.T. para os grupos que oferecem a opção NC ("não controlado").
+
+Só os Órgãos Fiscalizadores a têm: lá o NC nega as regras de todos os órgãos - ANVISA
+inclusive, já que a opção AV olha o campo da lista - e traz de uma vez o produto sem
+nenhum controle. Nas Listas ANVISA ele seria redundante e, com os grupos em OU, abriria
+uma segunda porta para todo o estoque não controlado.
+@type Function
+@author Pablo Regis
+@since  11/11/2026
+@param nParam, numeric, número da pergunta (PAR_ORG ou PAR_LIS)
+@return logical, .T. se o grupo tem a opção NC
+/*/
+Static Function fTemNC(nParam)
+
+Return nParam == PAR_ORG
+
+/*/{Protheus.doc} fTiraOpc
+Seleção sem um código, preservando a ordem dos demais. Usada por fValida para tirar a
+opção AV do grupo de órgãos quando a ANVISA é detalhada pelas listas marcadas.
+@type Function
+@author Pablo Regis
+@since  11/11/2026
+@param cSel, character, códigos marcados (fSelGrp)
+@param cCod, character, código a retirar
+@return character, códigos restantes
+/*/
+Static Function fTiraOpc(cSel, cCod)
+
+Local cRet := ""
+Local cAtu := ""
+Local nI   := 0
+
+For nI := 1 To Len(cSel) Step ORG_TAM
+	cAtu := SubStr(cSel, nI, ORG_TAM)
+	If cAtu <> cCod
+		cRet += cAtu
+	EndIf
+Next nI
+
+Return cRet
+
 /*/{Protheus.doc} fOpcGrp
 Opções de um grupo para o f_Opcoes, no formato "XX - DESCRIÇÃO" exigido pela função
-(código com ORG_TAM posições seguido de " - "). NC é sempre a última opção: não é um
-órgão nem uma lista, serve para trazer os produtos fora do grupo.
+(código com ORG_TAM posições seguido de " - ").
 @type Function
 @author Pablo Regis
 @since  05/11/2026
 @param aGrupo, array, grupo de opções (fOrgaos ou fListas)
 @param cCodigos, character, retorna a concatenação dos códigos na ordem das opções (por referência)
 @param cDescNC, character, descrição da opção NC; o padrão serve para quem só precisa dos códigos
+@param lTemNC, logical, .T. acrescenta a opção NC ao final do grupo (ver fTemNC)
 @return array, opções exibidas na tela do f_Opcoes
 /*/
-Static Function fOpcGrp(aGrupo, cCodigos, cDescNC)
+Static Function fOpcGrp(aGrupo, cCodigos, cDescNC, lTemNC)
 
 Local aOpcoes := {}
 Local nI      := 0
 
 Default cDescNC := "NÃO CONTROLADO"
+Default lTemNC  := .T.
 
 cCodigos := ""
 
@@ -1856,22 +2053,27 @@ For nI := 1 To Len(aGrupo)
 	cCodigos += aGrupo[nI][ORG_COD]
 Next nI
 
-aAdd(aOpcoes, ORG_NC + " - " + cDescNC)
-cCodigos += ORG_NC
+//-- NC é sempre a última opção: não é um órgão nem uma lista, serve para trazer os
+//-- produtos fora do grupo
+If lTemNC
+	aAdd(aOpcoes, ORG_NC + " - " + cDescNC)
+	cCodigos += ORG_NC
+EndIf
 
 Return aOpcoes
 
 /*/{Protheus.doc} fDefGrp
-Conteúdo inicial da pergunta de um grupo: todas as opções do grupo marcadas, com NC
-marcado ou não conforme lNC.
+Conteúdo inicial da pergunta de um grupo: todas as opções do grupo marcadas e, nos
+grupos que têm NC, a posição do NC marcada ou não conforme lMarcaNC.
 @type Function
 @author Pablo Regis
 @since  05/11/2026
 @param aGrupo, array, grupo de opções (fOrgaos ou fListas)
-@param lNC, logical, .T. marca também a opção "não controlado"
+@param lTemNC, logical, .T. se o grupo tem a opção NC (ver fTemNC)
+@param lMarcaNC, logical, .T. marca também a opção "não controlado"
 @return character, conteúdo inicial da pergunta
 /*/
-Static Function fDefGrp(aGrupo, lNC)
+Static Function fDefGrp(aGrupo, lTemNC, lMarcaNC)
 
 Local cRet := ""
 Local nI   := 0
@@ -1880,17 +2082,20 @@ For nI := 1 To Len(aGrupo)
 	cRet += aGrupo[nI][ORG_COD]
 Next nI
 
-If lNC
-	cRet += ORG_NC
-Else
-	cRet += Replicate("*", ORG_TAM)
+If lTemNC
+	If lMarcaNC
+		cRet += ORG_NC
+	Else
+		cRet += Replicate("*", ORG_TAM)
+	EndIf
 EndIf
 
 Return cRet
 
 /*/{Protheus.doc} fOrgDef
-Conteúdo inicial da pergunta MV_PAR11: os 4 órgãos marcados e NC desmarcado, ou seja,
-só produtos controlados por algum órgão - o comportamento histórico do relatório.
+Conteúdo inicial da pergunta MV_PAR11: os 4 órgãos marcados (ANVISA inclusive) e NC
+desmarcado, ou seja, só produtos controlados por algum órgão - o comportamento
+histórico do relatório.
 @type Function
 @author Pablo Regis
 @since  05/11/2026
@@ -1899,16 +2104,16 @@ só produtos controlados por algum órgão - o comportamento histórico do relatório
 Static Function fOrgDef()
 
 Local aGrupo := fOrgaos()
-Local cRet   := fDefGrp(aGrupo, .F.)
+Local cRet   := fDefGrp(aGrupo, .T., .F.)
 
 FwFreeArray(aGrupo)
 
 Return cRet
 
 /*/{Protheus.doc} fLisDef
-Conteúdo inicial da pergunta MV_PAR12: todas as listas e NC marcados. Assim o
-parâmetro nasce sem restringir nada e o recorte por lista é uma escolha explícita do
-usuário - inclusive quando o campo da lista não existir no dicionário.
+Conteúdo inicial da pergunta MV_PAR12: todas as listas marcadas, o que equivale a
+"qualquer lista da 344/98" - mesmo recorte da opção AV sozinha. O grupo não tem opção
+NC, porque "não controlado" é o NC dos Órgãos Fiscalizadores.
 @type Function
 @author Pablo Regis
 @since  05/11/2026
@@ -1917,7 +2122,7 @@ usuário - inclusive quando o campo da lista não existir no dicionário.
 Static Function fLisDef()
 
 Local aGrupo := fListas()
-Local cRet   := fDefGrp(aGrupo, .T.)
+Local cRet   := fDefGrp(aGrupo, .F., .F.)
 
 FwFreeArray(aGrupo)
 
