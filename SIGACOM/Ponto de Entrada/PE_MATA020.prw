@@ -19,7 +19,7 @@ User Function CUSTOMERVENDOR()
     Local lIsGrid      := .F.
     Local oModel       := FwModelActive()
     Local nOpc
-    Local cCampSens    := SuperGetMv("CP_AUDFOR",.F.,"A2_MSBLQL|A2_XSTATU")
+    Local cCampSens    := SuperGetMv("CP_AUDFOR",.F.,"A2_MSBLQL|A2_NOVSTA")
     Local aCampSens    := StrTokarr(cCampSens,"|")
     Local cCampoAtu    := ""
     Local xValorAnt    := Nil
